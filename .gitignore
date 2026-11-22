@@ -18,3 +18,5 @@ RESULTS.md
 paper_outline.md
 .playwright-mcp/
 ctx_repo.zip
+llm_feat_*.npz
+clsfeat_*.npz

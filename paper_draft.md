@@ -864,6 +864,14 @@ baselines are planned. On the hardware side, the O(DK²) envelope and
 locality of all updates map naturally onto FPGA or analog
 crossbar/photonic implementations — a claim we keep deliberately at
 the architectural level pending a system-level energy study.
+Finally, preliminary transfer tests on frozen GPT-2 embeddings in a
+domain-return classification protocol expose the same mechanism under
+a stricter constraint: the gate's slot-error time constant
+($\alpha_{\mathrm{ema}}$) must be far shorter than the
+regime-transition window to avoid onset poisoning from a stale slot,
+and the consolidation trigger must be rescaled to the task's error
+baseline — with a fivefold faster gate the same code reduced
+return-onset error from 0.30 to 0.23 on 768-d features.
 
 ## 6. Conclusion
 
