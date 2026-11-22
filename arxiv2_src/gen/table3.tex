@@ -1,0 +1,10 @@
+\begin{tabular}{lllll}
+\toprule
+Batch & APIA peak & LoRA peak & LoRA step & Status \\
+\midrule
+1 & 3,243 & 3,989 & 268 ms & fits \\
+4 & 3,425 & \textbf{6,191} & 575 ms & exceeds wall \\
+8 & 3,670 & \textbf{9,159} & 1,267 ms & $\sim$4GB spill \\
+32 & 5,132 & --- & --- & APIA still fits \\
+\bottomrule
+\end{tabular}

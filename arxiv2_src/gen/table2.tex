@@ -1,0 +1,14 @@
+\begin{tabular}{lllll}
+\toprule
+Model & lr & Onset err & Phase-end & Observation \\
+\midrule
+GPT-2 Medium & 1e-3 & 0.49 & 0.53 & divergence \\
+GPT-2 Medium & 1e-4 & \textbf{0.09} & 0.06 & optimal \\
+GPT-2 Medium & 1e-5 & 0.51 & 0.51 & no learning \\
+GPT-2 Large & 1e-3 & 0.52 & 0.51 & divergence \\
+GPT-2 Large & 1e-4 & \textbf{0.06} & 0.02 & optimal (unpredictable) \\
+GPT-2 Large & 1e-5 & 0.32 & 0.18 & partial/slow \\
+OPT-1.3B (T4) & 1e-3 & 0.46 & 0.60 & divergence (cross-family) \\
+OPT-1.3B (T4) & 1e-4 & \textbf{0.05} & 0.04 & optimal \\
+\bottomrule
+\end{tabular}

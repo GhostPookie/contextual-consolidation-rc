@@ -1,0 +1,12 @@
+\begin{tabular}{lllll}
+\toprule
+Batch & APIA peak & LoRA peak & LoRA/APIA & Status \\
+\midrule
+1 & 2,731 & 2,961 & 1.08$\times$ & both fit \\
+4 & 3,002 & 3,839 & 1.28$\times$ & both fit \\
+8 & 3,361 & 5,008 & 1.49$\times$ & both fit \\
+16 & 4,082 & 7,345 & 1.80$\times$ & both fit \\
+32 & 5,523 & 12,023 & 2.18$\times$ & LoRA near wall \\
+64 & 8,406 & \textbf{OOM} & --- & LoRA $>$16GB wall \\
+\bottomrule
+\end{tabular}
