@@ -8,7 +8,10 @@ MODEL = "facebook/opt-1.3b"
 SEQ = 128
 REPS = 2
 APIA_BS = [1, 4, 8, 16, 32, 64]
-LORA_BS = [1, 4, 8, 16, 32]
+LORA_BS = [1, 4, 8, 16, 32, 64]   # B=64 OOMs on a 16GB T4 (measured, peak=-1)
+# Kaggle note: if peft raises "incompatible version of torchao", run
+#   pip uninstall -y torchao
+# in a prior cell — the shipped torchao==0.10.0 predates the supported range.
 OUT = "/kaggle/working/vram_opt13b.json"
 
 dev = "cuda"

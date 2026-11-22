@@ -99,8 +99,21 @@ Continual adaptation of large language models to shifting domains typically reli
 
 *Table 3: Peak VRAM on the 6,144MB device (frozen gpt2-large, seq-128). APIA grows only by transient forward activations; the ~400KB learning state is CPU-side. LoRA blows past the wall at B=4 — retained backward activations + grads + AdamW state are structural to gradient descent.*
 
-- Figure (fig_vram_wall): APIA 3,243→5,132MB at B=1→32; LoRA 3,989→9,159MB at B=1→8, over 6GB wall at B≥4.
-- Timing caveat: scopes differ (feature-space RLS vs full fwd+bwd+opt) — speed gap is a lower bound, not a headline; memory divergence is the structural claim.
+> The wall moves, but does not disappear. Repeating the same scan on a frozen OPT-1.3B backbone (fp16, weights 2,632MB) on a 16GB T4, the adapter grows 2,731→8,406MB from B=1 to B=64 — under half the device at every point. The LoRA arm reaches 12,023MB at B=32 and OOMs at B=64; the LoRA/APIA peak ratio grows monotonically with batch (1.08× → 2.18×). More headroom delays the divergence; it does not remove it, because the retained-activation bill is proportional to batch while the forward-only cost is not.
+
+| Batch Size | APIA Peak VRAM | LoRA Peak VRAM | LoRA/APIA Ratio | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | 2,731 MB | 2,961 MB | 1.08× | Both fit |
+| 4 | 3,002 MB | 3,839 MB | 1.28× | Both fit |
+| 8 | 3,361 MB | 5,008 MB | 1.49× | Both fit |
+| 16 | 4,082 MB | 7,345 MB | 1.80× | Both fit |
+| 32 | 5,523 MB | 12,023 MB | 2.18× | LoRA near wall |
+| 64 | 8,406 MB | **OOM** | — | **LoRA exceeds 16GB wall** |
+
+*Table 4: Peak VRAM on a 15,636MB T4 (frozen OPT-1.3B fp16, seq-128, Kaggle). The same divergence pattern repeats at the higher ceiling; the LoRA arm reaches OOM at B=64 while the adapter still uses ~54% of the device.*
+
+- Figure 3 (fig_vram_dual): two panels, one wall each — 6GB gpt2-large and 16GB OPT-1.3B.
+- Timing caveat: scopes differ (feature-space RLS vs full fwd+bwd+opt) — speed gap is a lower bound, not a headline; memory divergence is the structural claim. On the T4 the scope gap is explicit: LoRA runs 26–32ms/sample fwd+bwd+opt at all measured batch sizes while APIA amortizes to 0.3ms/sample at B=64.
 
 ## 5. Discussion (~0.75 pp)
 
@@ -109,10 +122,10 @@ Continual adaptation of large language models to shifting domains typically reli
 > **Limitations.** We state the boundaries of this proof-of-concept transparently:
 > 1. **Accuracy vs. tunability trade-off:** when perfectly tuned (lr=1e-4), LoRA reaches 0.09/0.06 onset on medium/large vs the adapter's 0.18/0.20 — and the gap grows with scale. We explicitly trade peak accuracy for elimination of tuning fragility and guaranteed memory bounds.
 > 2. **Feature normalization:** current experiments use stream-wide statistics; true online deployment requires a streaming mean/variance tracker.
-> 3. **Scope:** GPT-2 family only (d ≤ 1280), single binary domain-return stream, LoRA arm is one r=8 config (rank/schedule variants unexplored).
+> 3. **Scope:** accuracy claims cover the GPT-2 family only (d ≤ 1280) on a single binary domain-return stream; the VRAM scan extends to OPT-1.3B fp16 but without an accuracy arm on that backbone. The LoRA baseline is one r=8 config (rank/schedule variants unexplored).
 > 4. **Gate latency:** the slot-match EMA imposes a lag of order 1/α_ema steps after each regime shift; at the default 0.01 the stale slot poisons the onset (measured 0.30→0.23 with α_ema=0.05).
 >
-> **Future work.** Quantify the VRAM divergence on larger backbones (1.3B+), where LoRA's wall moves but does not disappear; quantized (int8/int4) RLS to shrink adapter state; dynamic slot allocation on severe context mismatch; direct mapping of the O(d·K²) update to FPGA/analog hardware.
+> **Future work.** The 1.3B wall is now measured (Table 4): next steps are an accuracy arm on OPT-scale backbones, still larger models (2.7B/6.7B) where fp16 weights alone approach the 16GB ceiling, quantized (int8/int4) RLS to shrink adapter state, dynamic slot allocation on severe context mismatch, and direct mapping of the O(d·K²) update to FPGA/analog hardware.
 
 ## 6. Conclusion (~0.25 pp)
 
@@ -123,9 +136,9 @@ Continual adaptation of large language models to shifting domains typically reli
 ## Figures & tables to generate
 - Fig 1: architecture diagram (reuse fig1 style + LLM branch).
 - Fig 2: lr-sweep — LoRA onset vs lr (3 pts, log x) + APIA flat line.
-- Fig 3: fig_vram_wall.png (extend APIA arm to B=32).
-- Tab 1: scale sweep; Tab 2: lr sweep; Tab 3: VRAM/timing by batch.
+- Fig 3: fig_vram_dual.png (two hardware tiers: 6GB gpt2-large, 16GB OPT-1.3B).
+- Tab 1: scale sweep; Tab 2: lr sweep; Tab 3: VRAM/timing by batch (6GB); Tab 4: VRAM by batch (16GB T4).
 
 ## Data sources (single truth)
-`spike_results.json` — keys: per-model `apia`/`lora`/`lr_*`, `vram_scaling`.
-Scripts: `cls_spike.py`, `adapter_spike.py`, `scale_spike.py`, `vram_spike.py`.
+`spike_results.json` — keys: per-model `apia`/`lora`/`lr_*`, `vram_scaling` (6GB gpt2-large), `vram_scaling_opt13b` (16GB T4 OPT-1.3B fp16).
+Scripts: `cls_spike.py`, `adapter_spike.py`, `scale_spike.py`, `vram_spike.py`, `kaggle_1p3b_vram.py` (Kaggle T4 notebook).
