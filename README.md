@@ -78,6 +78,21 @@ python lint_pdf.py                # render-level checks (needs tectonic+pdftotex
 Every run uses `np.random.default_rng(seed)` — seeds 0-9 (main),
 0-4 (cross-family). Results are bit-reproducible.
 
+## Phase-2 spikes (preliminary, not part of the paper)
+
+Same mechanism mounted on frozen GPT-2 features, tested against
+online LoRA on a domain-return classification stream
+(`spike_results.json` for all numbers):
+
+![Scale sweep: APIA vs online LoRA](fig_phase2_scale.png)
+
+The honest finding is not "APIA is more accurate" — tuned LoRA wins
+on accuracy (0.09 vs 0.18 onset). It is that APIA needs **no learning
+rate at all** and stays flat (0.18-0.24) from 124M to 774M while the
+same LoRA config collapses; updates cost ~1 ms regardless of model
+size vs 61-196 ms. See `llm_spike.py`, `cls_spike.py`,
+`adapter_spike.py`, `scale_spike.py`.
+
 ## Paper
 
 `paper_draft.md` -> `paper.tex` -> `paper.pdf` (19 pp).
