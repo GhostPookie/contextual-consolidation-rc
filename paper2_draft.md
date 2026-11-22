@@ -53,18 +53,43 @@ Continual adaptation of large language models to shifting domains typically reli
 
 > Table 1 reports return-onset error for both arms across the GPT-2 family. With identical configuration — no learning rate exists to retune — the adapter's onset error stays within 0.18–0.24 from 124M to 774M parameters. Identically configured online LoRA (r=8, lr=1e-3, a setting that works well at 124M) degrades to 0.49–0.52 on the two larger models, i.e., near-chance. The adapter's learning dynamics live entirely in feature space (φ_t ∈ R^d, d ≤ 1280): the readout and memory see the same dimensionality regardless of how many parameters produced the features, so scale changes the backbone, not the learning problem.
 
-- Data: APIA onset 0.23/0.18/0.20 at 124M/355M/774M; LoRA(lr=1e-3) 0.19/0.49/0.52.
+| Model Scale | Parameters | APIA Onset | LoRA (lr=1e-3) Onset | LoRA Status |
+| :--- | :--- | :--- | :--- | :--- |
+| GPT-2 | 124M | 0.23 | 0.19 | Optimal |
+| GPT-2 Medium | 355M | 0.18 | 0.49 | Diverged |
+| GPT-2 Large | 774M | 0.20 | 0.52 | Diverged |
+
+*Table 1: APIA remains stable across scales without tuning, while a fixed LoRA configuration (lr=1e-3) collapses as model size increases.*
 
 ### 4.3 Finding 2 — lr fragility
 
 > Section 4.2's LoRA collapse is not a fundamental failure of low-rank adaptation — it is a tuning failure. Table 2 sweeps lr ∈ {1e-3, 1e-4, 1e-5} on gpt2-medium and gpt2-large. On medium, lr=1e-3 diverges (0.49 onset), lr=1e-4 attains 0.09, and lr=1e-5 never learns (0.51). On large the pattern repeats: lr=1e-3 diverges (0.52), lr=1e-4 attains the best onset of the whole study (0.06), and lr=1e-5 only partially learns within the stream (0.32 onset, still improving at 0.18 by phase end). Two observations matter for deployment: (i) the usable window is narrow — a factor of 10 in either direction destroys or cripples the run; (ii) the window's position is not predictable from the smaller model — 1e-3 is optimal at 124M and fatal at 355M+. In a streaming setting there is no held-out pass for a grid search; the stream arrives once. The adapter sidesteps the question entirely: RLS has no step-size parameter, and the identical configuration that runs at 124M runs at 774M.
 
-- Data: medium lr∈{1e-3,1e-4,1e-5} → onset 0.49/0.09/0.51; large → 0.52/0.06/0.32.
+| Model | Learning Rate | Return-Onset Error | Phase-End Error | Observation |
+| :--- | :--- | :--- | :--- | :--- |
+| GPT-2 Medium | 1e-3 | 0.49 | 0.53 | Divergence |
+| GPT-2 Medium | 1e-4 | **0.09** | 0.06 | Optimal |
+| GPT-2 Medium | 1e-5 | 0.51 | 0.51 | No learning |
+| GPT-2 Large | 1e-3 | 0.52 | 0.51 | Divergence |
+| GPT-2 Large | 1e-4 | **0.06** | 0.02 | Optimal (but unpredictable) |
+| GPT-2 Large | 1e-5 | 0.32 | 0.18 | Partial/slow learning |
+
+*Table 2: The viable learning-rate window is narrow and shifts with scale. Streaming deployment cannot afford this grid-search.*
+
 - Honest note: tuned LoRA beats APIA decisively on accuracy (0.06–0.09 vs 0.18–0.20 onset) — the gap grows with scale, and this must be stated, not hidden. The claim is tunability + memory, not accuracy.
 
 ### 4.4 Finding 3 — VRAM wall
 
 > Figure 3 changes the axis from accuracy to hardware cost. On a 6GB device running frozen gpt2-large (seq-128), peak VRAM for the forward-only adapter grows from 3,243MB at batch 1 to 5,132MB at batch 32 — transient activations freed under `no_grad`, plus ~400KB of feature-space state on CPU. The LoRA arm (fwd+bwd+AdamW) reaches 6,191MB at batch 4 — already past the device's physical 6,144MB — and requests 9,159MB at batch 8, forcing ~4GB of spill into shared RAM where step time inflates 2.2× (575→1,267ms) from memory pressure, not compute. Note this is the independent property, not a corollary of §4.3: even a perfectly tuned LoRA pays this memory bill, because retained activations and optimizer state are structural to gradient descent, not to any particular lr.
+
+| Batch Size | APIA Peak VRAM | LoRA Peak VRAM | LoRA Step Time | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | 3,243 MB | 3,989 MB | 268 ms | Fits |
+| 4 | 3,425 MB | **6,191 MB** | 575 ms | **Exceeds 6GB wall** |
+| 8 | 3,670 MB | **9,159 MB** | 1,267 ms | ~4GB spill to shared RAM |
+| 32 | 5,132 MB | — | — | APIA still fits |
+
+*Table 3: Peak VRAM on the 6,144MB device (frozen gpt2-large, seq-128). APIA grows only by transient forward activations; the ~400KB learning state is CPU-side. LoRA blows past the wall at B=4 — retained backward activations + grads + AdamW state are structural to gradient descent.*
 
 - Figure (fig_vram_wall): APIA 3,243→5,132MB at B=1→32; LoRA 3,989→9,159MB at B=1→8, over 6GB wall at B≥4.
 - Timing caveat: scopes differ (feature-space RLS vs full fwd+bwd+opt) — speed gap is a lower bound, not a headline; memory divergence is the structural claim.
