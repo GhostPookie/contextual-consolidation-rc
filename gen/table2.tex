@@ -1,0 +1,13 @@
+\begin{tabular}{lcccc}
+\toprule
+Method & F1-end & F2-end & F3-onset (primary) & F3-end \\
+\midrule
+FullRLS+bound & 3.8e-11 & 0.108 & $8.17\pm3.92$ & 2.3e-05 \\
+BlockRLS+bound & 1.6e-04 & 0.545 & $0.459\pm0.22$ & 1.0e-02 \\
++naive memory & 1.6e-04 & 0.543 & 0.455 & 1.0e-02 \\
++MultiHead (prior art) & 1.6e-04 & 0.545 & $0.422\pm0.16$ & 9.3e-03 \\
++MultiHead+alloc & 1.6e-04 & 0.547 & $0.369\pm0.13$ & 7.6e-03 \\
++MultiHead+alloc+soft & 1.6e-04 & 0.547 & $0.268\pm0.09$ & 7.6e-03 \\
+\textbf{+CTX (final)} & 1.9e-04 & 0.443 & $\mathbf{0.096\pm0.02}$ & 3.7e-02 \\
+\bottomrule
+\end{tabular}

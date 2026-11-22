@@ -1,0 +1,11 @@
+\begin{tabular}{lcccc}
+\toprule
+Method & $\lambda$ & NMSE @5000 & Update & $P$ memory \\
+\midrule
+Ridge (batch) & --- & $\approx$9e-6 & offline & --- \\
+Full RLS & 1.0 & $\approx$1e-3 & 3.4 ms/step & 7.6 MB \\
+Block-RLS & 1.0 & $\approx$2e-2 & 53 \textmu s/step & 78 kB \\
+Full RLS + bound & 0.98 & 8.1e-3 & 3.8 ms/step & 7.6 MB \\
+Block-RLS + bound & 0.98 & 0.115 & 87 \textmu s/step & 78 kB \\
+\bottomrule
+\end{tabular}

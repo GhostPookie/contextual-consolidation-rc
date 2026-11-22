@@ -1,0 +1,11 @@
+\begin{tabular}{lcc}
+\toprule
+Component & Ops/step & Memory (float64) \\
+\midrule
+ESN: $W_{\mathrm{res}}x + W_{\mathrm{in}}u$ + tanh & $\approx$1.1k MAC & $W_{\mathrm{res}}$ 8 kB + $W_{\mathrm{in}}$ 1 kB \\
+Spline map & $O(DK)\approx10^{3}$ & $\phi$ buffer 8 kB \\
+Block-RLS & $O(DK^{2})\approx10^{4}$ & $P$ 78 kB + $W_{\mathrm{fast}}$ 8 kB \\
+Ctx.\ memory & $O(SF)\approx3\cdot10^{3}$ & $W_{\mathrm{slow}}$ 24 kB \\
+\textbf{Total} & $\approx$130 \textmu s (Python, full update path) & \textbf{$\approx$0.13 MB} \\
+\bottomrule
+\end{tabular}
