@@ -37,7 +37,7 @@ MAX_TOK = 128
 CACHE = "clsfeat_{name}.npz"
 
 
-def load_domains():
+def load_domains(seed=7):
     """Two binary tasks on disjoint category pairs (regime switch)."""
     domA = fetch_20newsgroups(subset="all",
                               categories=["sci.space", "rec.sport.baseball"],
@@ -52,7 +52,7 @@ def load_domains():
     # category indices, already 0/1 within the subset)
     A = list(zip(domA.data, domA.target))
     B = list(zip(domB.data, domB.target))
-    rng = np.random.default_rng(7)
+    rng = np.random.default_rng(seed)
     rng.shuffle(A); rng.shuffle(B)
     # phase-3 uses a disjoint half of A (no train/test leakage)
     return A[:PA], B[:PB], A[PA:PA + PA_RET]

@@ -29,18 +29,21 @@ from cls_spike import (load_domains, get_features, SplineFeatureMap,
 LORA_LR = 1e-3
 
 
-def run_lora(texts, Y, tok, dev, bounds):
+def run_lora(texts, Y, tok, dev, bounds, lr=LORA_LR, seed=None,
+             model_id=None):
     """Online single-pass LoRA fine-tune; decisions recorded pre-update."""
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
+    if seed is not None:
+        torch.manual_seed(seed)
     base = AutoModelForSequenceClassification.from_pretrained(
-        MODEL_ID, num_labels=2)
+        model_id or MODEL_ID, num_labels=2)
     base.config.pad_token_id = tok.pad_token_id
     cfg = LoraConfig(r=8, lora_alpha=16, target_modules=["c_attn", "c_proj"],
                      lora_dropout=0.0, bias="none")
     mdl = get_peft_model(base, cfg).to(dev)
     mdl.print_trainable_parameters()
-    opt = torch.optim.AdamW(mdl.parameters(), lr=LORA_LR)
+    opt = torch.optim.AdamW(mdl.parameters(), lr=lr)
 
     # tokenize once (independent of update timing)
     enc = tok(texts, return_tensors="pt", padding=True, truncation=True,
