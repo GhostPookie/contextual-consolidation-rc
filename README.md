@@ -58,7 +58,9 @@ clamp control recovers only part of the gain — slot content matters.
 | `build_tex.py`, `lint_tex.py`, `lint_pdf.py` | md->tex build + render lint |
 | `metrics.json`, `fig_data.npz`, `saturation_data.npz`, `valve_data.npz`, `clamp_control.json` | measured data (single source of truth) |
 | `llm_spike.py`, `cls_spike.py`, `adapter_spike.py`, `scale_spike.py` | Phase-2 feasibility spikes: same mechanism on frozen GPT-2 features — time-series, domain-return classification, APIA-vs-LoRA head-to-head, 124M->774M scale sweep. Not part of the paper's protocol — seeds for a follow-up study |
-| `spike_results.json` | Phase-2 spike measurements (P3 errors, VRAM, ms/step, lr-sweep) |
+| `vram_spike.py` | Phase-2: gpt2-large batch sweep — APIA fwd-only vs LoRA fwd+bwd+AdamW peak VRAM (`vram_scaling` key) |
+| `fig_phase2_scale.py`, `fig_vram_wall.py` | README figure generators (data from `spike_results.json`) |
+| `spike_results.json` | Phase-2 spike measurements (P3 errors, VRAM, ms/step, lr-sweep, vram_scaling) |
 
 ## Reproduce
 
@@ -92,6 +94,30 @@ rate at all** and stays flat (0.18-0.24) from 124M to 774M while the
 same LoRA config collapses; updates cost ~1 ms regardless of model
 size vs 61-196 ms. See `llm_spike.py`, `cls_spike.py`,
 `adapter_spike.py`, `scale_spike.py`.
+
+### The scaling wall (measured on a 6GB device)
+
+Same protocol on frozen `gpt2-large`, seq-128, batch sweep 1→8
+(`vram_spike.py`, `spike_results.json[vram_scaling]`):
+
+![VRAM wall: LoRA spills, APIA stays flat](fig_vram_wall.png)
+
+| batch | APIA peak | LoRA peak |
+|---|---|---|
+| 1 | 3,243 MB | 3,989 MB |
+| 4 | 3,425 MB | **6,191 MB** |
+| 8 | 3,670 MB | **9,159 MB** |
+
+Batch 1→8: APIA grows +427 MB (transient forward activations only —
+`no_grad`, nothing retained for backward). LoRA grows +5,170 MB
+(retained activations + grads + AdamW state) and exceeds the 6GB
+physical wall already at batch 4 — beyond it, Windows spills ~4 GB
+into shared RAM and step time balloons (575→1,267 ms, spill overhead
+not compute). **APIA's learning-state cost scales with the feature
+dimension (~400 KB), not the model — the structural reason a frozen
+100B backbone could adapt in a fixed memory budget.** Timing scopes
+differ (APIA update is feature-space RLS; LoRA is full fwd+bwd+opt),
+so the speed gap is a lower bound, not a headline.
 
 ## Paper
 
