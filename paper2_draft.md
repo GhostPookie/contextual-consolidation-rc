@@ -29,28 +29,17 @@ Continual adaptation of large language models to shifting domains typically reli
 
 ## 3. Method (~1 pp)
 
-### 3.1 Frozen backbone → feature stream
-
-- Model weights frozen (`requires_grad=False`); single forward per example under `torch.no_grad()`. The learning/inference boundary: the backbone is pure inference — all learning happens feature-space-side, so no gradient graph is ever built through the model.
-- Feature: last-token hidden state of final block, d ∈ {768, 1024, 1280} for GPT-2 s/m/l. Adapter sees only φ_t ∈ R^d — a fixed interface, model-size-agnostic by construction.
-- Online standardization of features (note: current spikes use whole-stream statistics — flagged limitation, future runs must use streaming mean/var).
-- Optional fixed random projection (768→100, tanh) shown to bottleneck probe accuracy (90.25%→81.25%); main experiments use standardized raw features.
-
-### 3.2 Spline expansion + block-diagonal RLS
-
-- Per-dimension cubic B-spline features; block-diagonal RLS readout, exact per-step update, no learning rate (second-order; step size implicit in covariance P).
-- Learning state: W, P blocks over spline features — ~250–410KB, lives on CPU, independent of model size.
-
-### 3.3 Write-protected contextual memory
-
-- Fast ungated channel (W_fast, always written) + N gated slow slots (consolidated, protected).
-- Consolidation trigger rescaled to task error baseline (e_gate=1.0 for 0/1 labels; the regression-calibrated e_fast ≤ e_gate·E[y²] nearly disables consolidation on classification).
-- Gate time constant must be << regime-transition window: α_ema=0.01 (~100-step lag) poisons onset via stale slots; α_ema=0.05, η=5.0 reduces return-onset error 0.30→0.23.
-
-### 3.4 Why no lr / why VRAM-flat
-
-- RLS has no step-size hyperparameter: update magnitude set by Kalman gain from P.
-- Forward-only: activations transient, freed per batch — peak = weights + O(B·d·L) transient, not weights + activations + grads + 2×optimizer state.
+> Our approach attaches a backpropagation-free, stateful adapter to the frozen representations of a pre-trained language model. The architecture strictly enforces a predict-before-update, single-pass constraint, ensuring that no gradient graph is ever constructed through the backbone.
+>
+> **3.1 Frozen backbone and feature stream.** The base model weights are frozen (`requires_grad=False`), and inference is executed under `torch.no_grad()`. For each incoming sequence we extract the last-token hidden state of the final transformer block, yielding φ_t ∈ R^d, d ∈ {768, 1024, 1280} for the GPT-2 family. The adapter operates exclusively in this feature space: because the interface dimension d is bounded and independent of backbone parameter count, the learning problem is structurally identical whether features come from a 124M or a 774M model. In the reported experiments features are standardized with stream-wide statistics; online deployment requires a streaming mean/variance estimator (Sec. 5). An optional fixed random projection (768→100, tanh) was found to bottleneck probe accuracy (90.25%→81.25%) and is not used in the main experiments.
+>
+> **3.2 Spline expansion and block-diagonal RLS.** To capture non-linear boundaries without backpropagation, φ_t is expanded by a fixed per-dimension cubic B-spline basis (R^d → R^{d·K+1}, K=10, plus bias). The expanded representation feeds a block-diagonal recursive least-squares readout. RLS is second-order: the update magnitude is set implicitly by the inverse-covariance blocks P, so there is no step-size hyperparameter to tune. The block-diagonal approximation keeps per-step cost at O(d·K²) and the full learning state (W_fast, P) at ~250–410KB on CPU — independent of backbone size.
+>
+> **3.3 Write-protected contextual memory.** The readout splits into a fast, ungated channel (W_fast, updated every step on the gated residual) and N gated slow slots (W_slow^(i)). Consolidation runs periodically (every `consolidate_every` steps) but only fires when the short-term fast error is stable, e_fast ≤ e_gate·m̂₂, where m̂₂ is an online estimate of E[y²] — a trigger that must be rescaled to the task's error baseline (e_gate=1.0 for 0/1 labels; the regression-calibrated 0.5 nearly disables consolidation on classification). Write protection then selects the target: if the best-matching slot's context-match error E_i = ||y_t − β φ_tᵀ W_slow^(i)||² — computed *excluding* W_fast to avoid self-masking — satisfies E_min < τ·m̂₂, that slot is reinforced; otherwise the write goes to the least-consolidated slot (argmin_i c_i), so heavily consolidated memories are not overwritten by transient noise. At saturation the 'refuse' policy skips the write entirely. The transfer preserves prediction continuity: W_slow^(k) ← W_slow^(k) + (1−γ)/β·W_fast, then W_fast ← γ·W_fast (γ=0.1).
+>
+> **3.4 Gate time constant.** The slot-match EMA must be much faster than the regime-transition window: the default α_ema=0.01 (~100-step lag) leaves a stale slot active at domain return and poisons the onset; α_ema=0.05 with sharper gating (η=5.0) reduced return-onset error 0.30→0.23 on raw-768 features.
+>
+> **3.5 Why no lr / why VRAM-flat (independent properties).** No-lr follows from RLS being second-order (update magnitude set by P). VRAM-flat follows from forward-only execution: activations are transient and freed per batch — peak ≈ weights + O(B·d·L) transient, not weights + activations + grads + 2×optimizer state. Both share the root of local forward-only learning but are NOT causally chained.
 
 ## 4. Experiments (~2 pp)
 
@@ -82,9 +71,15 @@ Continual adaptation of large language models to shifting domains typically reli
 
 ## 5. Discussion (~0.75 pp)
 
-- Unified message: two INDEPENDENT structural properties of local forward-only learning — (a) second-order updates ⇒ no tunable step size ⇒ scale-stable accuracy; (b) no backward graph ⇒ adaptation memory scales with features, not parameters ⇒ stays under hardware walls where fwd+bwd+optimizer cannot fit.
-- Limitations: (a) accuracy gap vs tuned LoRA is real and grows with scale (0.06–0.09 vs 0.18–0.20 onset at 355M/774M) — we trade accuracy for tunability + memory; (b) stream-wide feature normalization (online deployment needs streaming stats); (c) GPT-2 family only, d ≤ 1280; (d) single binary-classification stream; (e) LoRA arm is a single r=8 config — rank/schedule variants unexplored.
-- Future work: quantized RLS, larger backbones (6GB wall on 1.3B+), hardware mapping.
+> The empirical results establish a unified message: local, forward-only learning possesses two independent structural advantages over gradient-based adaptation in streaming environments. First, because RLS is second-order, it has no step-size hyperparameter, yielding scale-stable accuracy without per-model tuning. Second, because it requires no backward pass, its adaptation memory scales strictly with the feature dimension d, not the backbone size, allowing it to operate beneath hardware VRAM walls where forward+backward+optimizer pipelines fail. These are independent properties sharing a common root (forward-only execution), not a causal chain.
+>
+> **Limitations.** We state the boundaries of this proof-of-concept transparently:
+> 1. **Accuracy vs. tunability trade-off:** when perfectly tuned (lr=1e-4), LoRA reaches 0.09/0.06 onset on medium/large vs the adapter's 0.18/0.20 — and the gap grows with scale. We explicitly trade peak accuracy for elimination of tuning fragility and guaranteed memory bounds.
+> 2. **Feature normalization:** current experiments use stream-wide statistics; true online deployment requires a streaming mean/variance tracker.
+> 3. **Scope:** GPT-2 family only (d ≤ 1280), single binary domain-return stream, LoRA arm is one r=8 config (rank/schedule variants unexplored).
+> 4. **Gate latency:** the slot-match EMA imposes a lag of order 1/α_ema steps after each regime shift; at the default 0.01 the stale slot poisons the onset (measured 0.30→0.23 with α_ema=0.05).
+>
+> **Future work.** Quantify the VRAM divergence on larger backbones (1.3B+), where LoRA's wall moves but does not disappear; quantized (int8/int4) RLS to shrink adapter state; dynamic slot allocation on severe context mismatch; direct mapping of the O(d·K²) update to FPGA/analog hardware.
 
 ## 6. Conclusion (~0.25 pp)
 
