@@ -10,6 +10,7 @@ Per batch size: peak VRAM after load / after fwd / after bwd / after
 step. LoRA OOM is data, not failure.
 """
 
+import argparse
 import time
 import numpy as np
 import torch
@@ -21,6 +22,8 @@ MID = "openai-community/gpt2-large"
 BATCHES = [1, 4, 8]
 SEQ = 128
 REPS = 2                      # batches per setting (peak is stable)
+TARGETS = ["c_attn", "c_proj"]  # GPT-2 conv modules; OPT needs q_proj,v_proj
+OUT_JSON = "spike_results.json"
 
 
 def peak():
@@ -64,9 +67,9 @@ def lora_scan(tok, dev):
     torch.cuda.empty_cache(); torch.cuda.reset_peak_memory_stats()
     base = AutoModelForSequenceClassification.from_pretrained(
         MID, num_labels=2)
-    base.config.pad_token_id = 50256
+    base.config.pad_token_id = base.config.eos_token_id
     cfg = LoraConfig(r=8, lora_alpha=16,
-                     target_modules=["c_attn", "c_proj"],
+                     target_modules=TARGETS,
                      lora_dropout=0.0, bias="none")
     m = get_peft_model(base, cfg).to(dev)
     opt = torch.optim.AdamW(m.parameters(), lr=1e-4)
@@ -97,9 +100,27 @@ def lora_scan(tok, dev):
 
 
 def main():
+    global MID, BATCHES, SEQ, REPS, TARGETS, OUT_JSON
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default=MID)
+    ap.add_argument("--batches", default=",".join(map(str, BATCHES)),
+                    help="comma list, e.g. 1,4,8,16")
+    ap.add_argument("--seq", type=int, default=SEQ)
+    ap.add_argument("--reps", type=int, default=REPS)
+    ap.add_argument("--targets", default=",".join(TARGETS),
+                    help="LoRA target modules, e.g. q_proj,v_proj for OPT")
+    ap.add_argument("--out", default=OUT_JSON)
+    a = ap.parse_args()
+    MID = a.model
+    BATCHES = [int(x) for x in a.batches.split(",")]
+    SEQ, REPS = a.seq, a.reps
+    TARGETS = a.targets.split(",")
+    OUT_JSON = a.out
+
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(MID)
-    tok.pad_token = tok.eos_token
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
     A = apia_scan(tok, dev)
     L = lora_scan(tok, dev)
 
@@ -114,11 +135,13 @@ def main():
         print(f"{b:>4}{a['peak']:>10.0f}M{lp:>10}M"
               f"{a['ms']:>9.2f}{lm:>9}")
         res[str(b)] = {"apia": a, "lora": l}
-    D = json.load(open("spike_results.json"))
+    import os
+    D = json.load(open(OUT_JSON)) if os.path.exists(OUT_JSON) else {}
     D["vram_scaling"] = {"model": MID, "seq": SEQ,
-                         "weights_mb": A[1]["w"], "by_batch": res}
-    json.dump(D, open("spike_results.json", "w"), indent=2)
-    print("saved -> spike_results.json[vram_scaling]")
+                         "weights_mb": A[min(BATCHES)]["w"],
+                         "by_batch": res}
+    json.dump(D, open(OUT_JSON, "w"), indent=2)
+    print(f"saved -> {OUT_JSON}[vram_scaling]")
 
 
 if __name__ == "__main__":
