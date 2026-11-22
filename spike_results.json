@@ -67,14 +67,33 @@
     "learn_state_bytes": 410000
    },
    "lora": {
-    "p3_onset": 0.52,
-    "p3_end": 0.51,
-    "vram_mb": 4000,
-    "ms_per_step": 196.1,
+    "lr_1e-3": {
+     "p3_onset": 0.52,
+     "p3_end": 0.51,
+     "note": "diverged",
+     "vram_mb": 4000,
+     "ms_per_step": 196.1
+    },
     "trainable_params": 2432000,
-    "lr": 0.001,
     "r": 8,
-    "note": "diverged at lr=1e-3"
+    "lr_1e-4": {
+     "p1_end": 0.162,
+     "p2_end": 0.02,
+     "p3_onset": 0.06,
+     "p3_end": 0.02,
+     "vram_mb": 4001,
+     "ms_per_step": 152.0,
+     "trainable_params": 4055040
+    },
+    "lr_1e-5": {
+     "p1_end": 0.47,
+     "p2_end": 0.37,
+     "p3_onset": 0.32,
+     "p3_end": 0.18,
+     "vram_mb": 4001,
+     "ms_per_step": 120.9,
+     "trainable_params": 4055040
+    }
    }
   }
  },

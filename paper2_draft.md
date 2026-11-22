@@ -56,20 +56,29 @@ Continual adaptation of large language models to shifting domains typically reli
 - Finding order rationale: 4.2 establishes the adapter is stable where LoRA needs tuning; 4.3 shows *why* (the tuning window itself shifts with scale); 4.4 shifts axis from accuracy to hardware cost. Findings 2–3 are presented as independent properties, not a causal chain.
 
 ### 4.2 Finding 1 — scale-stability
-- Table: APIA onset 0.23/0.18/0.20 at 124M/355M/774M; LoRA(lr=1e-3) 0.19/0.49/0.52.
+
+> Table 1 reports return-onset error for both arms across the GPT-2 family. With identical configuration — no learning rate exists to retune — the adapter's onset error stays within 0.18–0.24 from 124M to 774M parameters. Identically configured online LoRA (r=8, lr=1e-3, a setting that works well at 124M) degrades to 0.49–0.52 on the two larger models, i.e., near-chance. The adapter's learning dynamics live entirely in feature space (φ_t ∈ R^d, d ≤ 1280): the readout and memory see the same dimensionality regardless of how many parameters produced the features, so scale changes the backbone, not the learning problem.
+
+- Data: APIA onset 0.23/0.18/0.20 at 124M/355M/774M; LoRA(lr=1e-3) 0.19/0.49/0.52.
 
 ### 4.3 Finding 2 — lr fragility
-- Table/figure: LoRA lr∈{1e-3,1e-4,1e-5} on 355M → 0.49/0.09/0.54; window shifts with scale.
-- Honest note: tuned LoRA beats APIA on accuracy (0.09 vs 0.18) — the trade is tunability.
+
+> Section 4.2's LoRA collapse is not a fundamental failure of low-rank adaptation — it is a tuning failure. Table 2 sweeps lr ∈ {1e-3, 1e-4, 1e-5} on gpt2-medium and gpt2-large. On medium, lr=1e-3 diverges (0.49 onset), lr=1e-4 attains 0.09, and lr=1e-5 never learns (0.51). On large the pattern repeats: lr=1e-3 diverges (0.52), lr=1e-4 attains the best onset of the whole study (0.06), and lr=1e-5 only partially learns within the stream (0.32 onset, still improving at 0.18 by phase end). Two observations matter for deployment: (i) the usable window is narrow — a factor of 10 in either direction destroys or cripples the run; (ii) the window's position is not predictable from the smaller model — 1e-3 is optimal at 124M and fatal at 355M+. In a streaming setting there is no held-out pass for a grid search; the stream arrives once. The adapter sidesteps the question entirely: RLS has no step-size parameter, and the identical configuration that runs at 124M runs at 774M.
+
+- Data: medium lr∈{1e-3,1e-4,1e-5} → onset 0.49/0.09/0.51; large → 0.52/0.06/0.32.
+- Honest note: tuned LoRA beats APIA decisively on accuracy (0.06–0.09 vs 0.18–0.20 onset) — the gap grows with scale, and this must be stated, not hidden. The claim is tunability + memory, not accuracy.
 
 ### 4.4 Finding 3 — VRAM wall
+
+> Figure 3 changes the axis from accuracy to hardware cost. On a 6GB device running frozen gpt2-large (seq-128), peak VRAM for the forward-only adapter grows from 3,243MB at batch 1 to 5,132MB at batch 32 — transient activations freed under `no_grad`, plus ~400KB of feature-space state on CPU. The LoRA arm (fwd+bwd+AdamW) reaches 6,191MB at batch 4 — already past the device's physical 6,144MB — and requests 9,159MB at batch 8, forcing ~4GB of spill into shared RAM where step time inflates 2.2× (575→1,267ms) from memory pressure, not compute. Note this is the independent property, not a corollary of §4.3: even a perfectly tuned LoRA pays this memory bill, because retained activations and optimizer state are structural to gradient descent, not to any particular lr.
+
 - Figure (fig_vram_wall): APIA 3,243→5,132MB at B=1→32; LoRA 3,989→9,159MB at B=1→8, over 6GB wall at B≥4.
 - Timing caveat: scopes differ (feature-space RLS vs full fwd+bwd+opt) — speed gap is a lower bound, not a headline; memory divergence is the structural claim.
 
 ## 5. Discussion (~0.75 pp)
 
 - Unified message: two INDEPENDENT structural properties of local forward-only learning — (a) second-order updates ⇒ no tunable step size ⇒ scale-stable accuracy; (b) no backward graph ⇒ adaptation memory scales with features, not parameters ⇒ stays under hardware walls where fwd+bwd+optimizer cannot fit.
-- Limitations: (a) accuracy gap vs tuned LoRA; (b) stream-wide feature normalization (online deployment needs streaming stats); (c) GPT-2 family only, small d; (d) classification stream only.
+- Limitations: (a) accuracy gap vs tuned LoRA is real and grows with scale (0.06–0.09 vs 0.18–0.20 onset at 355M/774M) — we trade accuracy for tunability + memory; (b) stream-wide feature normalization (online deployment needs streaming stats); (c) GPT-2 family only, d ≤ 1280; (d) single binary-classification stream; (e) LoRA arm is a single r=8 config — rank/schedule variants unexplored.
 - Future work: quantized RLS, larger backbones (6GB wall on 1.3B+), hardware mapping.
 
 ## 6. Conclusion (~0.25 pp)
