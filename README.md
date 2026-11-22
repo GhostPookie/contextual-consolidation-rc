@@ -107,17 +107,19 @@ Same protocol on frozen `gpt2-large`, seq-128, batch sweep 1→8
 | 1 | 3,243 MB | 3,989 MB |
 | 4 | 3,425 MB | **6,191 MB** |
 | 8 | 3,670 MB | **9,159 MB** |
+| 32 | 5,132 MB | — (already past the wall) |
 
-Batch 1→8: APIA grows +427 MB (transient forward activations only —
-`no_grad`, nothing retained for backward). LoRA grows +5,170 MB
-(retained activations + grads + AdamW state) and exceeds the 6GB
-physical wall already at batch 4 — beyond it, Windows spills ~4 GB
-into shared RAM and step time balloons (575→1,267 ms, spill overhead
-not compute). **APIA's learning-state cost scales with the feature
-dimension (~400 KB), not the model — the structural reason a frozen
-100B backbone could adapt in a fixed memory budget.** Timing scopes
-differ (APIA update is feature-space RLS; LoRA is full fwd+bwd+opt),
-so the speed gap is a lower bound, not a headline.
+Batch 1→32: APIA stays under the wall the whole way (+1,889 MB of
+transient forward activations only — `no_grad`, nothing retained for
+backward). LoRA grows +5,170 MB by batch 8 alone (retained
+activations + grads + AdamW state), exceeding the 6GB physical wall
+at batch 4 — beyond it, Windows spills ~4 GB into shared RAM and step
+time balloons (575→1,267 ms, spill overhead not compute). **APIA's
+learning-state cost scales with the feature dimension (~400 KB), not
+the model — the structural reason a frozen 100B backbone could adapt
+in a fixed memory budget.** Timing scopes differ (APIA update is
+feature-space RLS; LoRA is full fwd+bwd+opt), so the speed gap is a
+lower bound, not a headline.
 
 ## Paper
 
