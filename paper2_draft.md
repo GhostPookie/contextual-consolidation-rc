@@ -43,11 +43,19 @@ Continual adaptation of large language models to shifting domains typically reli
 
 ## 4. Experiments (~2 pp)
 
-### 4.1 Setup
-- 20 Newsgroups domain-return stream A→B→A′, single pass, predict-before-update.
-- Baselines: same-adapter block-RLS (no memory), online LoRA r=8 (q,v) + AdamW.
-- Metrics: phase-end / return-onset error, peak VRAM (torch.cuda.max_memory_allocated), per-step ms.
-- Finding order rationale: 4.2 establishes the adapter is stable where LoRA needs tuning; 4.3 shows *why* (the tuning window itself shifts with scale); 4.4 shifts axis from accuracy to hardware cost. Findings 2–3 are presented as independent properties, not a causal chain.
+### 4.1 Experimental Setup
+
+> **Tasks and protocol.** We evaluate continual adaptation on a single-pass, domain-return classification stream built from 20 Newsgroups: phase 1 learns domain A (sci.space vs rec.sport.baseball, 600 samples), phase 2 domain B (comp.graphics vs talk.politics.misc, 600 samples), phase 3 returns to fresh samples of domain A′ (400 samples). Strict online constraints throughout: single pass, predict-before-update, no replay buffer, no offline batch training.
+>
+> **Models and baselines.** The adapter attaches to the frozen GPT-2 backbone (124M/355M/774M; `requires_grad=False`, `torch.no_grad()` inference). The learning boundary is strict: the backbone provides pure inference features (last-token hidden state, d ∈ {768, 1024, 1280}) and all adaptation happens feature-space-side. Two arms: (i) **APIA** — block-diagonal RLS over spline-expanded features + write-protected contextual memory (S=3 slots), learning state ≈250–410KB on CPU, independent of model scale; (ii) **online LoRA** — r=8 on `c_attn`/`c_proj`, AdamW, updated per sample on the same stream.
+>
+> *Feature normalization caveat: reported experiments standardize with stream-wide statistics; edge deployment requires a streaming estimator (Sec. 5).*
+>
+> **Metrics.** Phase-end and return-onset error (first 100 samples of A′ — adaptation speed and forgetting); peak VRAM via `torch.cuda.max_memory_allocated()`; per-step latency.
+>
+> **Hardware.** GPT-2-scale runs on an RTX 3060 Laptop (6GB) deliberately below the wall; the 1.3B extension (OPT-1.3B) targets a 16GB Kaggle T4 to re-test divergence at a higher ceiling.
+>
+> *Finding order: 4.2 establishes stability where LoRA needs tuning; 4.3 shows why (the window shifts with scale); 4.4 shifts the axis from accuracy to hardware cost. Findings 2–3 are independent properties, not a causal chain.*
 
 ### 4.2 Finding 1 — scale-stability
 
