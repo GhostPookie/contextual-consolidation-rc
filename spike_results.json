@@ -1,0 +1,37 @@
+{
+  "experiment": "Phase-2 scaling spike: frozen-LLM + APIA vs online LoRA",
+  "date": "2026-11-22",
+  "protocol": "20newsgroups A(sci.space vs rec.sport) -> B(comp.graphics vs politics) -> A'(held-out), 600/600/400 samples, single pass, predict-then-update, batch-1",
+  "hardware": "RTX 3060 Laptop 6GB, torch 2.6.0+cu124, transformers 5.16.1, peft 0.20.0",
+  "results": {
+    "openai-community/gpt2": {
+      "hidden_dim": 768,
+      "apia": {"p3_onset": 0.230, "p3_end": 0.170, "vram_mb_batch1": 528, "vram_mb_batch32": 1088, "ms_per_step": 0.5, "learn_state_bytes": 246000},
+      "lora": {"p3_onset": 0.190, "p3_end": 0.110, "vram_mb": 691, "ms_per_step": 61.0, "trainable_params": 811008, "lr": 1e-3, "r": 8}
+    },
+    "openai-community/gpt2-medium": {
+      "hidden_dim": 1024,
+      "apia": {"p3_onset": 0.180, "p3_end": 0.190, "vram_mb_batch1": 1465, "vram_mb_batch32": 2613, "ms_per_step": 1.7, "learn_state_bytes": 328000},
+      "lora": {
+        "lr_1e-3": {"p3_onset": 0.490, "p3_end": 0.530, "note": "diverged"},
+        "lr_1e-4": {"p3_onset": 0.090, "p3_end": 0.060, "p1_end": 0.100, "p2_end": 0.060},
+        "lr_1e-5": {"p3_onset": 0.510, "p3_end": 0.510, "note": "never learned"},
+        "vram_mb": 1876, "ms_per_step": 126.7, "trainable_params": 1728000
+      }
+    },
+    "openai-community/gpt2-large": {
+      "hidden_dim": 1280,
+      "apia": {"p3_onset": 0.200, "p3_end": 0.240, "vram_mb_batch1": 3243, "vram_mb_batch32": 5163, "ms_per_step": 1.5, "learn_state_bytes": 410000},
+      "lora": {"p3_onset": 0.520, "p3_end": 0.510, "vram_mb": 4000, "ms_per_step": 196.1, "trainable_params": 2432000, "lr": 1e-3, "r": 8, "note": "diverged at lr=1e-3"}
+    }
+  },
+  "apia_config": "frozen last-hidden -> per-dim standardize -> clip -> cubic B-spline (K=10) -> BlockDiagRLS + ContextualMemory(n_slots=3, beta=1, gamma=0.1, eta=5, alpha_ema=0.05, e_gate=1.0, consolidate_every=250). Identical across all model sizes; no learning-rate-like parameter exists.",
+  "findings": [
+    "LoRA's usable lr window shifts with model scale (1e-3 optimal at 124M, divergent at >=355M; 1e-5 starved). Online single-pass deployment cannot grid-search lr.",
+    "APIA holds 0.18-0.24 P3-onset across 124M-774M with zero retuning; RLS has no lr.",
+    "Update cost is scale-independent for APIA (0.5-1.7 ms) vs LoRA 61->196 ms.",
+    "APIA learn state is CPU-resident ~0.25-0.4 MB; LoRA trainable params grow 0.8M->2.4M plus optimizer state.",
+    "Tuned LoRA (lr=1e-4, medium) beats APIA on accuracy (0.09 vs 0.18 onset): honest trade-off is fragility-free operation vs best-case accuracy."
+  ],
+  "scripts": {"llm_spike.py": "time-series transfer", "cls_spike.py": "domain-return classification", "adapter_spike.py": "3-arm head-to-head", "scale_spike.py": "scale sweep"}
+}

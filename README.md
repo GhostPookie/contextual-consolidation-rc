@@ -57,7 +57,8 @@ clamp control recovers only part of the gain — slot content matters.
 | `audit_numbers.py` | 24-assert data audit: every claim vs data files |
 | `build_tex.py`, `lint_tex.py`, `lint_pdf.py` | md->tex build + render lint |
 | `metrics.json`, `fig_data.npz`, `saturation_data.npz`, `valve_data.npz`, `clamp_control.json` | measured data (single source of truth) |
-| `llm_spike.py`, `cls_spike.py` | Phase-2 feasibility spikes: same mechanism on frozen GPT-2 features (time-series + domain-return classification). Not part of the paper's protocol — seeds for a follow-up study |
+| `llm_spike.py`, `cls_spike.py`, `adapter_spike.py`, `scale_spike.py` | Phase-2 feasibility spikes: same mechanism on frozen GPT-2 features — time-series, domain-return classification, APIA-vs-LoRA head-to-head, 124M->774M scale sweep. Not part of the paper's protocol — seeds for a follow-up study |
+| `spike_results.json` | Phase-2 spike measurements (P3 errors, VRAM, ms/step, lr-sweep) |
 
 ## Reproduce
 
