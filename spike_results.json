@@ -243,5 +243,57 @@
     }
    }
   }
+ },
+ "cls_opt13b": {
+  "model": "facebook/opt-1.3b",
+  "seq": 128,
+  "onset": 100,
+  "phases": [
+   600,
+   600,
+   400
+  ],
+  "dtype": "fp16",
+  "device": "Tesla T4",
+  "domains": {
+   "A": [
+    "sci.space",
+    "rec.sport.baseball"
+   ],
+   "B": [
+    "comp.graphics",
+    "talk.politics.misc"
+   ]
+  },
+  "source": "kaggle notebook ghostsa/notebookd6d9dc4766",
+  "apia_block": {
+   "p1_end": 0.21,
+   "p2_end": 0.12,
+   "p3_onset": 0.22,
+   "p3_end": 0.14
+  },
+  "apia_ctxmem": {
+   "p1_end": 0.21,
+   "p2_end": 0.21,
+   "p3_onset": 0.15,
+   "p3_end": 0.12,
+   "cons": 6
+  },
+  "lora_lr0.0001": {
+   "p1_end": 0.1,
+   "p2_end": 0.03,
+   "p3_onset": 0.05,
+   "p3_end": 0.04,
+   "peak_mb": 6741,
+   "s": 114
+  },
+  "lora_lr0.001": {
+   "p1_end": 0.46,
+   "p2_end": 0.53,
+   "p3_onset": 0.46,
+   "p3_end": 0.6,
+   "peak_mb": 6741,
+   "s": 106
+  }
  }
 }

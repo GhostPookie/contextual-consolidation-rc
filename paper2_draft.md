@@ -6,7 +6,7 @@
 
 ## Abstract (draft)
 
-Continual adaptation of large language models to shifting domains typically relies on gradient-based low-rank adapters (LoRA), which require per-model learning-rate tuning and incur VRAM costs that grow with batch size and model scale through retained activations and optimizer state. We attach a backpropagation-free adapter — a block-diagonal recursive least-squares readout over spline-expanded frozen features, coupled to a write-protected contextual memory — to GPT-2 family models (124M/355M/774M) on a single-pass domain-return classification stream. Across scales, the adapter's return-onset error stays flat (0.18–0.24) while identically-configured online LoRA collapses outside a narrow learning-rate window that shifts with model size (divergence at lr=1e-3 on 355M/774M, no learning at 1e-5, competitive accuracy only at 1e-4). On a 6GB device with frozen gpt2-large, LoRA's peak memory exceeds the physical wall at batch 4 and reaches 9.2GB at batch 8, while the adapter remains under the wall at batch 32 (5.1GB) with ~400KB of feature-space state independent of model size. Tuning-free, forward-only adaptation is feasible where gradient methods cannot be tuned or cannot fit. (Speed comparison is reported only as a scoped lower bound — update-path vs full training-step — not a headline claim.)
+Continual adaptation of large language models to shifting domains typically relies on gradient-based low-rank adapters (LoRA), which require per-model learning-rate tuning and incur VRAM costs that grow with batch size and model scale through retained activations and optimizer state. We attach a backpropagation-free adapter — a block-diagonal recursive least-squares readout over spline-expanded frozen features, coupled to a write-protected contextual memory — to GPT-2 family models (124M/355M/774M) and OPT-1.3B on a single-pass domain-return classification stream. Across scales and families, the adapter's return-onset error stays flat (0.15–0.24) while identically-configured online LoRA collapses outside a narrow learning-rate window that shifts with model size and family (divergence at lr=1e-3 on 355M/774M/1.3B, no learning at 1e-5, competitive accuracy only at 1e-4). On a 6GB device with frozen gpt2-large, LoRA's peak memory exceeds the physical wall at batch 4 and reaches 9.2GB at batch 8, while the adapter remains under the wall at batch 32 (5.1GB) with ~400KB of feature-space state independent of model size; on a 16GB T4 with frozen OPT-1.3B the same divergence repeats — LoRA reaches 12.0GB at batch 32 and OOMs at batch 64 where the adapter uses 8.4GB. Tuning-free, forward-only adaptation is feasible where gradient methods cannot be tuned or cannot fit. (Speed comparison is reported only as a scoped lower bound — update-path vs full training-step — not a headline claim.)
 
 ## 1. Introduction (~0.75 pp)
 
@@ -59,15 +59,16 @@ Continual adaptation of large language models to shifting domains typically reli
 
 ### 4.2 Finding 1 — scale-stability
 
-> Table 1 reports return-onset error for both arms across the GPT-2 family. With identical configuration — no learning rate exists to retune — the adapter's onset error stays within 0.18–0.24 from 124M to 774M parameters. Identically configured online LoRA (r=8, lr=1e-3, a setting that works well at 124M) degrades to 0.49–0.52 on the two larger models, i.e., near-chance. The adapter's learning dynamics live entirely in feature space (φ_t ∈ R^d, d ≤ 1280): the readout and memory see the same dimensionality regardless of how many parameters produced the features, so scale changes the backbone, not the learning problem.
+> Table 1 reports return-onset error for both arms across the GPT-2 family, extended to a different model family (OPT-1.3B, d=2048) on a 16GB T4. With identical configuration — no learning rate exists to retune — the adapter's onset error stays within 0.15–0.24 from 124M to 1.3B parameters. Identically configured online LoRA (r=8, lr=1e-3, a setting that works well at 124M) degrades to 0.46–0.52 on the larger models, i.e., near-chance. The adapter's learning dynamics live entirely in feature space (φ_t ∈ R^d): the readout and memory see the same dimensionality regardless of how many parameters produced the features, so scale changes the backbone, not the learning problem.
 
 | Model Scale | Parameters | APIA Onset | LoRA (lr=1e-3) Onset | LoRA Status |
 | :--- | :--- | :--- | :--- | :--- |
 | GPT-2 | 124M | 0.23 | 0.19 | Optimal |
 | GPT-2 Medium | 355M | 0.18 | 0.49 | Diverged |
 | GPT-2 Large | 774M | 0.20 | 0.52 | Diverged |
+| OPT-1.3B (fp16, T4) | 1.3B | 0.15 | 0.46 | Diverged |
 
-*Table 1: APIA remains stable across scales without tuning, while a fixed LoRA configuration (lr=1e-3) collapses as model size increases.*
+*Table 1: APIA remains stable across scales — and across model families — without tuning, while a fixed LoRA configuration (lr=1e-3) collapses as model size increases.*
 
 ### 4.3 Finding 2 — lr fragility
 
@@ -81,10 +82,14 @@ Continual adaptation of large language models to shifting domains typically reli
 | GPT-2 Large | 1e-3 | 0.52 | 0.51 | Divergence |
 | GPT-2 Large | 1e-4 | **0.06** | 0.02 | Optimal (but unpredictable) |
 | GPT-2 Large | 1e-5 | 0.32 | 0.18 | Partial/slow learning |
+| OPT-1.3B (T4) | 1e-3 | 0.46 | 0.60 | Divergence (cross-family) |
+| OPT-1.3B (T4) | 1e-4 | **0.05** | 0.04 | Optimal |
 
-*Table 2: The viable learning-rate window is narrow and shifts with scale. Streaming deployment cannot afford this grid-search.*
+*Table 2: The viable learning-rate window is narrow and shifts with scale — and the pattern repeats on a different model family (OPT-1.3B): 1e-3 diverges, 1e-4 is again optimal. Streaming deployment cannot afford this grid-search.*
 
-- Honest note: tuned LoRA beats APIA decisively on accuracy (0.06–0.09 vs 0.18–0.20 onset) — the gap grows with scale, and this must be stated, not hidden. The claim is tunability + memory, not accuracy.
+> On OPT-1.3B the memory arm also transfers: `apia_ctxmem` reaches 0.15 return-onset vs 0.22 for the memoryless `apia_block` (6 consolidations over the stream), confirming that write-protected consolidation operates on frozen features from a second model family without retuning.
+
+- Honest note: tuned LoRA beats APIA decisively on accuracy (0.05–0.09 vs 0.15–0.23 onset, now including OPT-1.3B) — the gap persists across families, and this must be stated, not hidden. The claim is tunability + memory, not accuracy.
 
 ### 4.4 Finding 3 — VRAM wall
 
@@ -120,16 +125,16 @@ Continual adaptation of large language models to shifting domains typically reli
 > The empirical results establish a unified message: local, forward-only learning possesses two independent structural advantages over gradient-based adaptation in streaming environments. First, because RLS is second-order, it has no step-size hyperparameter, yielding scale-stable accuracy without per-model tuning. Second, because it requires no backward pass, its adaptation memory scales strictly with the feature dimension d, not the backbone size, allowing it to operate beneath hardware VRAM walls where forward+backward+optimizer pipelines fail. These are independent properties sharing a common root (forward-only execution), not a causal chain.
 >
 > **Limitations.** We state the boundaries of this proof-of-concept transparently:
-> 1. **Accuracy vs. tunability trade-off:** when perfectly tuned (lr=1e-4), LoRA reaches 0.09/0.06 onset on medium/large vs the adapter's 0.18/0.20 — and the gap grows with scale. We explicitly trade peak accuracy for elimination of tuning fragility and guaranteed memory bounds.
+> 1. **Accuracy vs. tunability trade-off:** when perfectly tuned (lr=1e-4), LoRA reaches 0.09/0.06/0.05 onset on medium/large/OPT-1.3B vs the adapter's 0.18/0.20/0.15 — the gap persists across families. We explicitly trade peak accuracy for elimination of tuning fragility and guaranteed memory bounds.
 > 2. **Feature normalization:** current experiments use stream-wide statistics; true online deployment requires a streaming mean/variance tracker.
-> 3. **Scope:** accuracy claims cover the GPT-2 family only (d ≤ 1280) on a single binary domain-return stream; the VRAM scan extends to OPT-1.3B fp16 but without an accuracy arm on that backbone. The LoRA baseline is one r=8 config (rank/schedule variants unexplored).
+> 3. **Scope:** accuracy claims cover the GPT-2 family (d ≤ 1280) plus OPT-1.3B fp16 (d = 2048) on a single binary domain-return stream; broader tasks and further families remain open. The LoRA baseline is one r=8 config (rank/schedule variants unexplored).
 > 4. **Gate latency:** the slot-match EMA imposes a lag of order 1/α_ema steps after each regime shift; at the default 0.01 the stale slot poisons the onset (measured 0.30→0.23 with α_ema=0.05).
 >
-> **Future work.** The 1.3B wall is now measured (Table 4): next steps are an accuracy arm on OPT-scale backbones, still larger models (2.7B/6.7B) where fp16 weights alone approach the 16GB ceiling, quantized (int8/int4) RLS to shrink adapter state, dynamic slot allocation on severe context mismatch, and direct mapping of the O(d·K²) update to FPGA/analog hardware.
+> **Future work.** Both the 1.3B wall (Table 4) and the 1.3B accuracy arm (Tables 1–2) are now measured: next steps are still larger models (2.7B/6.7B) where fp16 weights alone approach the 16GB ceiling, quantized (int8/int4) RLS to shrink adapter state, dynamic slot allocation on severe context mismatch, multi-seed robustness, and direct mapping of the O(d·K²) update to FPGA/analog hardware.
 
 ## 6. Conclusion (~0.25 pp)
 
-> We have demonstrated that tuning-free, forward-only adaptation is a viable and structurally superior alternative to gradient-based adapters in streaming, hardware-constrained settings. By operating exclusively in the frozen feature space with block-diagonal RLS and write-protected contextual memory, our method eliminates the learning rate tuning burden and decouples adaptation memory from model scale. Empirical results on the GPT-2 family confirm that while online LoRA is highly fragile to learning rate choices that shift with model size, our adapter remains stable. Furthermore, on a 6GB device, the adapter avoids the VRAM wall that forces gradient-based methods into severe memory-spill overhead. This establishes a clear path toward deployable, lifelong learning for large models at the edge.
+> We have demonstrated that tuning-free, forward-only adaptation is a viable and structurally superior alternative to gradient-based adapters in streaming, hardware-constrained settings. By operating exclusively in the frozen feature space with block-diagonal RLS and write-protected contextual memory, our method eliminates the learning rate tuning burden and decouples adaptation memory from model scale. Empirical results on the GPT-2 family — extended to OPT-1.3B on a 16GB T4 — confirm that while online LoRA is highly fragile to learning rate choices that shift with model size and family, our adapter remains stable. Furthermore, on both a 6GB device and a 16GB accelerator, the adapter avoids the VRAM wall that forces gradient-based methods into spill overhead or outright OOM. This establishes a clear path toward deployable, lifelong learning for large models at the edge.
 
 ---
 
@@ -140,5 +145,5 @@ Continual adaptation of large language models to shifting domains typically reli
 - Tab 1: scale sweep; Tab 2: lr sweep; Tab 3: VRAM/timing by batch (6GB); Tab 4: VRAM by batch (16GB T4).
 
 ## Data sources (single truth)
-`spike_results.json` — keys: per-model `apia`/`lora`/`lr_*`, `vram_scaling` (6GB gpt2-large), `vram_scaling_opt13b` (16GB T4 OPT-1.3B fp16).
-Scripts: `cls_spike.py`, `adapter_spike.py`, `scale_spike.py`, `vram_spike.py`, `kaggle_1p3b_vram.py` (Kaggle T4 notebook).
+`spike_results.json` — keys: per-model `apia`/`lora`/`lr_*`, `vram_scaling` (6GB gpt2-large), `vram_scaling_opt13b` (16GB T4 OPT-1.3B fp16), `cls_opt13b` (OPT-1.3B accuracy arm).
+Scripts: `cls_spike.py`, `adapter_spike.py`, `scale_spike.py`, `vram_spike.py`, `kaggle_1p3b_vram.py`, `kaggle_cls_opt13b.py` (Kaggle T4 notebook).
