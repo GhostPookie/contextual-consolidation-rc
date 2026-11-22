@@ -10,17 +10,22 @@ Continual adaptation of large language models to shifting domains typically reli
 
 ## 1. Introduction (~0.75 pp)
 
-- Problem: continual/domain-shift adaptation of frozen LLMs in streaming settings.
-- Why existing methods strain: gradient adapters need (i) learning rates tuned per model scale, (ii) backward passes retaining activations, (iii) optimizer state.
-- Our claim: an adapter with *no learning rate* and *no backward pass* — RLS + write-protected contextual memory over frozen features. Strict constraints: single pass, predict-before-update, no replay buffer, no offline batch.
-- Contributions: (1) same mechanism transfers from reservoirs to frozen GPT-2; (2) measured scale-stability vs LoRA lr-fragility; (3) measured VRAM divergence on real 6GB hardware.
-- NOTE (read-tour fix): the two structural properties are INDEPENDENT — no-lr comes from RLS being second-order; VRAM-flat comes from forward-only (no retained activations). Do NOT chain them causally in prose ("because it needs no lr, it avoids the wall" is wrong). Common root: local forward-only learning.
+> Continual adaptation of large language models (LLMs) to shifting data distributions is typically addressed via gradient-based parameter-efficient fine-tuning (PEFT) methods, such as LoRA. While effective in offline settings, these methods face two fundamental bottlenecks in streaming, resource-constrained environments: (1) they require careful, model-specific learning rate tuning, where a suboptimal choice leads to catastrophic divergence or failure to learn; and (2) they incur substantial VRAM overhead due to the retention of backward-pass activations and optimizer states, which scales unfavorably with batch size and model parameters.
+>
+> We propose a fundamentally different approach: a backpropagation-free, tuning-free adapter based on block-diagonal recursive least squares (RLS) coupled with write-protected contextual memory, operating entirely in the frozen feature space of the LLM. Because RLS is a second-order method, it possesses no step-size hyperparameter, eliminating the need for learning rate tuning. Furthermore, by strictly enforcing a forward-only, predict-before-update regime, our adapter avoids building a gradient graph, keeping peak VRAM dependent only on transient feature activations, not on model scale or optimizer state.
+>
+> In this work, we demonstrate this mechanism on a single-pass domain-return classification stream using the GPT-2 family (124M to 774M parameters). We show that while identically configured online LoRA collapses outside a narrow, scale-dependent learning rate window, our adapter maintains stable return-onset error (0.18–0.24) across all scales. Finally, we empirically map the VRAM divergence on a 6GB device, showing that the adapter remains well within hardware limits even at large batch sizes, whereas the gradient-based baseline exceeds physical memory and incurs severe spill-overhead.
+
+- Strict constraints (keep in prose or setup): single pass, predict-before-update, no replay buffer, no offline batch.
+- NOTE (read-tour fix): the two structural properties are INDEPENDENT — no-lr comes from RLS being second-order; VRAM-flat comes from forward-only (no retained activations). Do NOT chain them causally ("because it needs no lr, it avoids the wall" is wrong). Common root: local forward-only learning.
 
 ## 2. Related Work (~0.5 pp)
 
-- Parameter-efficient adaptation: LoRA/adapters, prompt tuning.
-- Continual learning w/o replay: regularization (EWC), architectural (slots/memory).
-- Gradient-free/local learning: reservoir computing, RLS readouts, forward-only methods.
+> **Parameter-Efficient Fine-Tuning (PEFT).** Methods like LoRA [Hu et al., 2021] and adapters [Houlsby et al., 2019] reduce trainable parameters but remain fundamentally gradient-based. They require backward passes, retaining activations in memory, and optimizer states (e.g., Adam), making their VRAM footprint structurally tied to batch size and sequence length, regardless of the low rank.
+>
+> **Continual Learning without Replay.** Catastrophic forgetting is often mitigated via regularization (EWC, SI) or architectural isolation. However, these typically assume access to gradient signals or stored data buffers. Our work aligns with memory-based continual learning but operates strictly under single-pass, no-replay, and no-gradient constraints.
+>
+> **Gradient-Free and Local Learning.** Reservoir computing and online RLS have long provided efficient, forward-only adaptation for time-series prediction. We extend this paradigm to frozen LLM feature streams, demonstrating that second-order, local update rules can provide robust, tuning-free adaptation where first-order gradient descent is either too fragile to tune or too expensive to fit.
 
 ## 3. Method (~1 pp)
 
@@ -83,7 +88,7 @@ Continual adaptation of large language models to shifting domains typically reli
 
 ## 6. Conclusion (~0.25 pp)
 
-- Tuning-free forward-only adaptation works under walls where gradient adapters cannot be tuned or cannot fit.
+> We have demonstrated that tuning-free, forward-only adaptation is a viable and structurally superior alternative to gradient-based adapters in streaming, hardware-constrained settings. By operating exclusively in the frozen feature space with block-diagonal RLS and write-protected contextual memory, our method eliminates the learning rate tuning burden and decouples adaptation memory from model scale. Empirical results on the GPT-2 family confirm that while online LoRA is highly fragile to learning rate choices that shift with model size, our adapter remains stable. Furthermore, on a 6GB device, the adapter avoids the VRAM wall that forces gradient-based methods into severe memory-spill overhead. This establishes a clear path toward deployable, lifelong learning for large models at the edge.
 
 ---
 
