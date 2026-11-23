@@ -39,12 +39,13 @@ md = re.sub(r'^> \*(claim|message|framing)[^\n]*\*\n?', '', md,
 
 # ---------- 1) tables -> gen/table*.tex + inline table env ----------
 CAPS = {
-    1: ("Return-onset error across scales and families. Identical "
-        "configuration throughout; the adapter has no lr to retune. "
-        "OPT-1.3B row measured on a 16GB T4 (fp16)."),
-    2: ("Learning-rate fragility of online LoRA (r=8). The viable "
-        "window is narrow and shifts with scale; the pattern repeats "
-        "on a different model family (OPT-1.3B)."),
+    1: ("Return-onset error across scales and families (mean$\\pm$std, "
+        "3 seeds; OPT-1.3B single-seed). Identical configuration "
+        "throughout; the adapter has no lr to retune."),
+    2: ("Learning-rate fragility of online LoRA (r=8; mean$\\pm$std, "
+        "3 seeds; OPT-1.3B single-seed). The viable window is narrow "
+        "and shifts with scale; the pattern repeats on a different "
+        "model family."),
     3: ("Peak VRAM on a 6,144MB device (frozen gpt2-large, seq-128). "
         "APIA grows only via transient forward activations; the "
         "$\\sim$400KB learning state is CPU-resident."),
@@ -58,24 +59,24 @@ BODIES = {
 \toprule
 Model & Params & APIA onset & LoRA (lr=1e-3) & LoRA status \\
 \midrule
-GPT-2 & 124M & 0.23 & 0.19 & optimal \\
-GPT-2 Medium & 355M & 0.18 & 0.49 & diverged \\
-GPT-2 Large & 774M & 0.20 & 0.52 & diverged \\
-OPT-1.3B (fp16, T4) & 1.3B & 0.15 & 0.46 & diverged \\
+GPT-2 & 124M & $0.32{\pm}0.04$ & $0.46{\pm}0.04$ & seed-dependent \\
+GPT-2 Medium & 355M & $0.28{\pm}0.05$ & $0.36{\pm}0.17$ & unstable/late div. \\
+GPT-2 Large & 774M & $0.32{\pm}0.05$ & $0.47{\pm}0.04$ & diverged \\
+OPT-1.3B (fp16, T4) & 1.3B & 0.15 (n=1) & 0.46 (n=1) & diverged \\
 \bottomrule
 \end{tabular}""",
     2: r"""\begin{tabular}{lllll}
 \toprule
 Model & lr & Onset err & Phase-end & Observation \\
 \midrule
-GPT-2 Medium & 1e-3 & 0.49 & 0.53 & divergence \\
-GPT-2 Medium & 1e-4 & \textbf{0.09} & 0.06 & optimal \\
-GPT-2 Medium & 1e-5 & 0.51 & 0.51 & no learning \\
-GPT-2 Large & 1e-3 & 0.52 & 0.51 & divergence \\
-GPT-2 Large & 1e-4 & \textbf{0.06} & 0.02 & optimal (unpredictable) \\
-GPT-2 Large & 1e-5 & 0.32 & 0.18 & partial/slow \\
-OPT-1.3B (T4) & 1e-3 & 0.46 & 0.60 & divergence (cross-family) \\
-OPT-1.3B (T4) & 1e-4 & \textbf{0.05} & 0.04 & optimal \\
+GPT-2 Medium & 1e-3 & $0.36{\pm}0.17$ & $0.49{\pm}0.01$ & late divergence \\
+GPT-2 Medium & 1e-4 & \textbf{0.15$\bm{\pm}$0.05} & $0.08{\pm}0.02$ & optimal \\
+GPT-2 Medium & 1e-5 & $0.47{\pm}0.05$ & $0.40{\pm}0.05$ & no learning \\
+GPT-2 Large & 1e-3 & $0.47{\pm}0.04$ & $0.54{\pm}0.04$ & divergence \\
+GPT-2 Large & 1e-4 & \textbf{0.14$\bm{\pm}$0.04} & $0.08{\pm}0.01$ & optimal (a priori) \\
+GPT-2 Large & 1e-5 & $0.34{\pm}0.07$ & $0.12{\pm}0.07$ & partial/slow \\
+OPT-1.3B (T4) & 1e-3 & 0.46 (n=1) & 0.60 (n=1) & divergence (cross-family) \\
+OPT-1.3B (T4) & 1e-4 & \textbf{0.05} (n=1) & 0.04 (n=1) & optimal \\
 \bottomrule
 \end{tabular}""",
     3: r"""\begin{tabular}{lllll}
@@ -149,6 +150,7 @@ U = [
     ('\u03b7', r'$\eta$'),
     ('\u03c4', r'$\tau$'),
     ('\u2264', r'$\leq$'),
+    ('\u00b1', r'$\pm$'),
     ('\u2248', r'$\approx$'),
     ('\u2212', '-'),
     ('\u2013', '--'),
@@ -209,7 +211,7 @@ FIGS = [
          'only when the write trigger fires and the target passes '
          'write protection. The whole learning state is CPU-resident.',
          'fig:arch')),
-    (r'On OPT-1.3B the memory arm also transfers',
+    (r'The contextual-memory arm tells a more nuanced story',
      fig('fig2_lr_sweep.png',
          'Learning-rate fragility (return-onset error vs lr, log '
          'scale). LoRA forms a U-shape that bottoms near lr=1e-4 on '

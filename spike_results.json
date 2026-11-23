@@ -1,299 +1,895 @@
 {
- "experiment": "Phase-2 scaling spike: frozen-LLM + APIA vs online LoRA",
- "date": "2026-11-22",
- "protocol": "20newsgroups A(sci.space vs rec.sport) -> B(comp.graphics vs politics) -> A'(held-out), 600/600/400 samples, single pass, predict-then-update, batch-1",
- "hardware": "RTX 3060 Laptop 6GB, torch 2.6.0+cu124, transformers 5.16.1, peft 0.20.0",
- "results": {
-  "openai-community/gpt2": {
-   "hidden_dim": 768,
-   "apia": {
-    "p3_onset": 0.23,
-    "p3_end": 0.17,
-    "vram_mb_batch1": 528,
-    "vram_mb_batch32": 1088,
-    "ms_per_step": 0.5,
-    "learn_state_bytes": 246000
-   },
-   "lora": {
-    "p3_onset": 0.19,
-    "p3_end": 0.11,
-    "vram_mb": 691,
-    "ms_per_step": 61.0,
-    "trainable_params": 811008,
-    "lr": 0.001,
-    "r": 8
-   }
+  "experiment": "Phase-2 scaling spike: frozen-LLM + APIA vs online LoRA",
+  "date": "2026-11-22",
+  "protocol": "20newsgroups A(sci.space vs rec.sport) -> B(comp.graphics vs politics) -> A'(held-out), 600/600/400 samples, single pass, predict-then-update, batch-1",
+  "hardware": "RTX 3060 Laptop 6GB, torch 2.6.0+cu124, transformers 5.16.1, peft 0.20.0",
+  "results": {
+    "openai-community/gpt2": {
+      "hidden_dim": 768,
+      "apia": {
+        "p3_onset": 0.23,
+        "p3_end": 0.17,
+        "vram_mb_batch1": 528,
+        "vram_mb_batch32": 1088,
+        "ms_per_step": 0.5,
+        "learn_state_bytes": 246000
+      },
+      "lora": {
+        "p3_onset": 0.19,
+        "p3_end": 0.11,
+        "vram_mb": 691,
+        "ms_per_step": 61.0,
+        "trainable_params": 811008,
+        "lr": 0.001,
+        "r": 8
+      }
+    },
+    "openai-community/gpt2-medium": {
+      "hidden_dim": 1024,
+      "apia": {
+        "p3_onset": 0.18,
+        "p3_end": 0.19,
+        "vram_mb_batch1": 1465,
+        "vram_mb_batch32": 2613,
+        "ms_per_step": 1.7,
+        "learn_state_bytes": 328000
+      },
+      "lora": {
+        "lr_1e-3": {
+          "p3_onset": 0.49,
+          "p3_end": 0.53,
+          "note": "diverged"
+        },
+        "lr_1e-4": {
+          "p3_onset": 0.09,
+          "p3_end": 0.06,
+          "p1_end": 0.1,
+          "p2_end": 0.06
+        },
+        "lr_1e-5": {
+          "p3_onset": 0.51,
+          "p3_end": 0.51,
+          "note": "never learned"
+        },
+        "vram_mb": 1876,
+        "ms_per_step": 126.7,
+        "trainable_params": 1728000
+      }
+    },
+    "openai-community/gpt2-large": {
+      "hidden_dim": 1280,
+      "apia": {
+        "p3_onset": 0.2,
+        "p3_end": 0.24,
+        "vram_mb_batch1": 3243,
+        "vram_mb_batch32": 5163,
+        "ms_per_step": 1.5,
+        "learn_state_bytes": 410000
+      },
+      "lora": {
+        "lr_1e-3": {
+          "p3_onset": 0.52,
+          "p3_end": 0.51,
+          "note": "diverged",
+          "vram_mb": 4000,
+          "ms_per_step": 196.1
+        },
+        "trainable_params": 2432000,
+        "r": 8,
+        "lr_1e-4": {
+          "p1_end": 0.162,
+          "p2_end": 0.02,
+          "p3_onset": 0.06,
+          "p3_end": 0.02,
+          "vram_mb": 4001,
+          "ms_per_step": 152.0,
+          "trainable_params": 4055040
+        },
+        "lr_1e-5": {
+          "p1_end": 0.47,
+          "p2_end": 0.37,
+          "p3_onset": 0.32,
+          "p3_end": 0.18,
+          "vram_mb": 4001,
+          "ms_per_step": 120.9,
+          "trainable_params": 4055040
+        }
+      }
+    }
   },
-  "openai-community/gpt2-medium": {
-   "hidden_dim": 1024,
-   "apia": {
-    "p3_onset": 0.18,
-    "p3_end": 0.19,
-    "vram_mb_batch1": 1465,
-    "vram_mb_batch32": 2613,
-    "ms_per_step": 1.7,
-    "learn_state_bytes": 328000
-   },
-   "lora": {
-    "lr_1e-3": {
-     "p3_onset": 0.49,
-     "p3_end": 0.53,
-     "note": "diverged"
-    },
-    "lr_1e-4": {
-     "p3_onset": 0.09,
-     "p3_end": 0.06,
-     "p1_end": 0.1,
-     "p2_end": 0.06
-    },
-    "lr_1e-5": {
-     "p3_onset": 0.51,
-     "p3_end": 0.51,
-     "note": "never learned"
-    },
-    "vram_mb": 1876,
-    "ms_per_step": 126.7,
-    "trainable_params": 1728000
-   }
-  },
-  "openai-community/gpt2-large": {
-   "hidden_dim": 1280,
-   "apia": {
-    "p3_onset": 0.2,
-    "p3_end": 0.24,
-    "vram_mb_batch1": 3243,
-    "vram_mb_batch32": 5163,
-    "ms_per_step": 1.5,
-    "learn_state_bytes": 410000
-   },
-   "lora": {
-    "lr_1e-3": {
-     "p3_onset": 0.52,
-     "p3_end": 0.51,
-     "note": "diverged",
-     "vram_mb": 4000,
-     "ms_per_step": 196.1
-    },
-    "trainable_params": 2432000,
-    "r": 8,
-    "lr_1e-4": {
-     "p1_end": 0.162,
-     "p2_end": 0.02,
-     "p3_onset": 0.06,
-     "p3_end": 0.02,
-     "vram_mb": 4001,
-     "ms_per_step": 152.0,
-     "trainable_params": 4055040
-    },
-    "lr_1e-5": {
-     "p1_end": 0.47,
-     "p2_end": 0.37,
-     "p3_onset": 0.32,
-     "p3_end": 0.18,
-     "vram_mb": 4001,
-     "ms_per_step": 120.9,
-     "trainable_params": 4055040
-    }
-   }
-  }
- },
- "apia_config": "frozen last-hidden -> per-dim standardize -> clip -> cubic B-spline (K=10) -> BlockDiagRLS + ContextualMemory(n_slots=3, beta=1, gamma=0.1, eta=5, alpha_ema=0.05, e_gate=1.0, consolidate_every=250). Identical across all model sizes; no learning-rate-like parameter exists.",
- "findings": [
-  "LoRA's usable lr window shifts with model scale (1e-3 optimal at 124M, divergent at >=355M; 1e-5 starved). Online single-pass deployment cannot grid-search lr.",
-  "APIA holds 0.18-0.24 P3-onset across 124M-774M with zero retuning; RLS has no lr.",
-  "Update cost is scale-independent for APIA (0.5-1.7 ms) vs LoRA 61->196 ms.",
-  "APIA learn state is CPU-resident ~0.25-0.4 MB; LoRA trainable params grow 0.8M->2.4M plus optimizer state.",
-  "Tuned LoRA (lr=1e-4, medium) beats APIA on accuracy (0.09 vs 0.18 onset): honest trade-off is fragility-free operation vs best-case accuracy."
- ],
- "scripts": {
-  "llm_spike.py": "time-series transfer",
-  "cls_spike.py": "domain-return classification",
-  "adapter_spike.py": "3-arm head-to-head",
-  "scale_spike.py": "scale sweep"
- },
- "vram_scaling": {
-  "model": "openai-community/gpt2-large",
-  "seq": 128,
-  "weights_mb": 3172.251648,
-  "by_batch": {
-   "1": {
-    "apia": {
-     "w": 3172.251648,
-     "peak": 3243.049984,
-     "ms": 193.05904999782797
-    },
-    "lora": {
-     "w": 3197.657088,
-     "peak": 3988.991488,
-     "ms": 267.5435999990441
-    }
-   },
-   "4": {
-    "apia": {
-     "w": 3172.251648,
-     "peak": 3425.29536,
-     "ms": 21.622224998282036
-    },
-    "lora": {
-     "w": 3197.657088,
-     "peak": 6190.955008,
-     "ms": 575.430287502968
-    }
-   },
-   "8": {
-    "apia": {
-     "w": 3172.251648,
-     "peak": 3669.818368,
-     "ms": 24.044881249210448
-    },
-    "lora": {
-     "w": 3197.657088,
-     "peak": 9159.412224,
-     "ms": 1267.0491312510421
-    }
-   },
-   "32": {
-    "apia": {
-     "w": 3172.251648,
-     "peak": 5132.0,
-     "ms": 27.92
-    }
-   }
-  }
- },
- "vram_scaling_opt13b": {
-  "model": "facebook/opt-1.3b",
-  "seq": 128,
-  "dtype": "fp16",
-  "weights_mb": 2631.51616,
-  "device": "Tesla T4",
-  "device_mb": 15636,
-  "source": "kaggle notebook ghostsa/notebookd6d9dc4766",
-  "by_batch": {
-   "1": {
-    "apia": {
-     "w": 2631.51616,
-     "peak": 2731.126272,
-     "ms": 1157.4862615
-    },
-    "lora": {
-     "w": 2631.51616,
-     "peak": 2960.77312,
-     "ms": 232.4094395
-    }
-   },
-   "4": {
-    "apia": {
-     "w": 2631.51616,
-     "peak": 3002.2016,
-     "ms": 17.0988515
-    },
-    "lora": {
-     "w": 2631.51616,
-     "peak": 3838.80192,
-     "ms": 32.64785262
-    }
-   },
-   "8": {
-    "apia": {
-     "w": 2631.51616,
-     "peak": 3361.416704,
-     "ms": 3.67271831
-    },
-    "lora": {
-     "w": 2631.51616,
-     "peak": 5007.689728,
-     "ms": 30.87993306
-    }
-   },
-   "16": {
-    "apia": {
-     "w": 2631.51616,
-     "peak": 4081.747456,
-     "ms": 2.13446056
-    },
-    "lora": {
-     "w": 2631.51616,
-     "peak": 7345.178624,
-     "ms": 29.18496406
-    }
-   },
-   "32": {
-    "apia": {
-     "w": 2631.51616,
-     "peak": 5523.457536,
-     "ms": 0.67745119
-    },
-    "lora": {
-     "w": 2631.51616,
-     "peak": 12022.925312,
-     "ms": 26.31603909
-    }
-   },
-   "64": {
-    "apia": {
-     "w": 2631.51616,
-     "peak": 8406.353408,
-     "ms": 0.30424259
-    },
-    "lora": {
-     "w": 2631.51616,
-     "peak": -1,
-     "ms": -1
-    }
-   }
-  }
- },
- "cls_opt13b": {
-  "model": "facebook/opt-1.3b",
-  "seq": 128,
-  "onset": 100,
-  "phases": [
-   600,
-   600,
-   400
+  "apia_config": "frozen last-hidden -> per-dim standardize -> clip -> cubic B-spline (K=10) -> BlockDiagRLS + ContextualMemory(n_slots=3, beta=1, gamma=0.1, eta=5, alpha_ema=0.05, e_gate=1.0, consolidate_every=250). Identical across all model sizes; no learning-rate-like parameter exists.",
+  "findings": [
+    "LoRA's usable lr window shifts with model scale (1e-3 optimal at 124M, divergent at >=355M; 1e-5 starved). Online single-pass deployment cannot grid-search lr.",
+    "APIA holds 0.18-0.24 P3-onset across 124M-774M with zero retuning; RLS has no lr.",
+    "Update cost is scale-independent for APIA (0.5-1.7 ms) vs LoRA 61->196 ms.",
+    "APIA learn state is CPU-resident ~0.25-0.4 MB; LoRA trainable params grow 0.8M->2.4M plus optimizer state.",
+    "Tuned LoRA (lr=1e-4, medium) beats APIA on accuracy (0.09 vs 0.18 onset): honest trade-off is fragility-free operation vs best-case accuracy."
   ],
-  "dtype": "fp16",
-  "device": "Tesla T4",
-  "domains": {
-   "A": [
-    "sci.space",
-    "rec.sport.baseball"
-   ],
-   "B": [
-    "comp.graphics",
-    "talk.politics.misc"
-   ]
+  "scripts": {
+    "llm_spike.py": "time-series transfer",
+    "cls_spike.py": "domain-return classification",
+    "adapter_spike.py": "3-arm head-to-head",
+    "scale_spike.py": "scale sweep"
   },
-  "source": "kaggle notebook ghostsa/notebookd6d9dc4766",
-  "apia_block": {
-   "p1_end": 0.21,
-   "p2_end": 0.12,
-   "p3_onset": 0.22,
-   "p3_end": 0.14
+  "vram_scaling": {
+    "model": "openai-community/gpt2-large",
+    "seq": 128,
+    "weights_mb": 3172.251648,
+    "by_batch": {
+      "1": {
+        "apia": {
+          "w": 3172.251648,
+          "peak": 3243.049984,
+          "ms": 193.05904999782797
+        },
+        "lora": {
+          "w": 3197.657088,
+          "peak": 3988.991488,
+          "ms": 267.5435999990441
+        }
+      },
+      "4": {
+        "apia": {
+          "w": 3172.251648,
+          "peak": 3425.29536,
+          "ms": 21.622224998282036
+        },
+        "lora": {
+          "w": 3197.657088,
+          "peak": 6190.955008,
+          "ms": 575.430287502968
+        }
+      },
+      "8": {
+        "apia": {
+          "w": 3172.251648,
+          "peak": 3669.818368,
+          "ms": 24.044881249210448
+        },
+        "lora": {
+          "w": 3197.657088,
+          "peak": 9159.412224,
+          "ms": 1267.0491312510421
+        }
+      },
+      "32": {
+        "apia": {
+          "w": 3172.251648,
+          "peak": 5132.0,
+          "ms": 27.92
+        }
+      }
+    }
   },
-  "apia_ctxmem": {
-   "p1_end": 0.21,
-   "p2_end": 0.21,
-   "p3_onset": 0.15,
-   "p3_end": 0.12,
-   "cons": 6
+  "vram_scaling_opt13b": {
+    "model": "facebook/opt-1.3b",
+    "seq": 128,
+    "dtype": "fp16",
+    "weights_mb": 2631.51616,
+    "device": "Tesla T4",
+    "device_mb": 15636,
+    "source": "kaggle notebook ghostsa/notebookd6d9dc4766",
+    "by_batch": {
+      "1": {
+        "apia": {
+          "w": 2631.51616,
+          "peak": 2731.126272,
+          "ms": 1157.4862615
+        },
+        "lora": {
+          "w": 2631.51616,
+          "peak": 2960.77312,
+          "ms": 232.4094395
+        }
+      },
+      "4": {
+        "apia": {
+          "w": 2631.51616,
+          "peak": 3002.2016,
+          "ms": 17.0988515
+        },
+        "lora": {
+          "w": 2631.51616,
+          "peak": 3838.80192,
+          "ms": 32.64785262
+        }
+      },
+      "8": {
+        "apia": {
+          "w": 2631.51616,
+          "peak": 3361.416704,
+          "ms": 3.67271831
+        },
+        "lora": {
+          "w": 2631.51616,
+          "peak": 5007.689728,
+          "ms": 30.87993306
+        }
+      },
+      "16": {
+        "apia": {
+          "w": 2631.51616,
+          "peak": 4081.747456,
+          "ms": 2.13446056
+        },
+        "lora": {
+          "w": 2631.51616,
+          "peak": 7345.178624,
+          "ms": 29.18496406
+        }
+      },
+      "32": {
+        "apia": {
+          "w": 2631.51616,
+          "peak": 5523.457536,
+          "ms": 0.67745119
+        },
+        "lora": {
+          "w": 2631.51616,
+          "peak": 12022.925312,
+          "ms": 26.31603909
+        }
+      },
+      "64": {
+        "apia": {
+          "w": 2631.51616,
+          "peak": 8406.353408,
+          "ms": 0.30424259
+        },
+        "lora": {
+          "w": 2631.51616,
+          "peak": -1,
+          "ms": -1
+        }
+      }
+    }
   },
-  "lora_lr0.0001": {
-   "p1_end": 0.1,
-   "p2_end": 0.03,
-   "p3_onset": 0.05,
-   "p3_end": 0.04,
-   "peak_mb": 6741,
-   "s": 114
+  "cls_opt13b": {
+    "model": "facebook/opt-1.3b",
+    "seq": 128,
+    "onset": 100,
+    "phases": [
+      600,
+      600,
+      400
+    ],
+    "dtype": "fp16",
+    "device": "Tesla T4",
+    "domains": {
+      "A": [
+        "sci.space",
+        "rec.sport.baseball"
+      ],
+      "B": [
+        "comp.graphics",
+        "talk.politics.misc"
+      ]
+    },
+    "source": "kaggle notebook ghostsa/notebookd6d9dc4766",
+    "apia_block": {
+      "p1_end": 0.21,
+      "p2_end": 0.12,
+      "p3_onset": 0.22,
+      "p3_end": 0.14
+    },
+    "apia_ctxmem": {
+      "p1_end": 0.21,
+      "p2_end": 0.21,
+      "p3_onset": 0.15,
+      "p3_end": 0.12,
+      "cons": 6
+    },
+    "lora_lr0.0001": {
+      "p1_end": 0.1,
+      "p2_end": 0.03,
+      "p3_onset": 0.05,
+      "p3_end": 0.04,
+      "peak_mb": 6741,
+      "s": 114
+    },
+    "lora_lr0.001": {
+      "p1_end": 0.46,
+      "p2_end": 0.53,
+      "p3_onset": 0.46,
+      "p3_end": 0.6,
+      "peak_mb": 6741,
+      "s": 106
+    }
   },
-  "lora_lr0.001": {
-   "p1_end": 0.46,
-   "p2_end": 0.53,
-   "p3_onset": 0.46,
-   "p3_end": 0.6,
-   "peak_mb": 6741,
-   "s": 106
+  "multiseed_gpt2": {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "environment": "Kaggle T4, fp32",
+    "data": {
+      "gpt2": {
+        "apia_block": {
+          "per_seed": [
+            {
+              "p1_end": 0.14,
+              "p2_end": 0.15,
+              "p3_onset": 0.24,
+              "p3_end": 0.21,
+              "cons": 0
+            },
+            {
+              "p1_end": 0.18,
+              "p2_end": 0.22,
+              "p3_onset": 0.28,
+              "p3_end": 0.17,
+              "cons": 0
+            },
+            {
+              "p1_end": 0.17,
+              "p2_end": 0.15,
+              "p3_onset": 0.41,
+              "p3_end": 0.24,
+              "cons": 0
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.24,
+              0.28,
+              0.41
+            ],
+            "mean": 0.31,
+            "std": 0.0725718035235908
+          },
+          "p3_end": {
+            "seeds": [
+              0.21,
+              0.17,
+              0.24
+            ],
+            "mean": 0.20666666666666667,
+            "std": 0.028674417556808746
+          }
+        },
+        "apia_ctxmem": {
+          "per_seed": [
+            {
+              "p1_end": 0.26,
+              "p2_end": 0.13,
+              "p3_onset": 0.33,
+              "p3_end": 0.25,
+              "cons": 6
+            },
+            {
+              "p1_end": 0.17,
+              "p2_end": 0.26,
+              "p3_onset": 0.26,
+              "p3_end": 0.12,
+              "cons": 6
+            },
+            {
+              "p1_end": 0.17,
+              "p2_end": 0.18,
+              "p3_onset": 0.36,
+              "p3_end": 0.18,
+              "cons": 6
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.33,
+              0.26,
+              0.36
+            ],
+            "mean": 0.3166666666666667,
+            "std": 0.04189935029992178
+          },
+          "p3_end": {
+            "seeds": [
+              0.25,
+              0.12,
+              0.18
+            ],
+            "mean": 0.18333333333333335,
+            "std": 0.053124591501697425
+          }
+        },
+        "lora_lr0.001": {
+          "per_seed": [
+            {
+              "p1_end": 0.22,
+              "p2_end": 0.48,
+              "p3_onset": 0.42,
+              "p3_end": 0.5,
+              "ms_per_step": 38.8,
+              "peak_mb": 4562.47
+            },
+            {
+              "p1_end": 0.08,
+              "p2_end": 0.31,
+              "p3_onset": 0.44,
+              "p3_end": 0.23,
+              "ms_per_step": 38.8,
+              "peak_mb": 4562.47
+            },
+            {
+              "p1_end": 0.1,
+              "p2_end": 0.44,
+              "p3_onset": 0.51,
+              "p3_end": 0.45,
+              "ms_per_step": 39.0,
+              "peak_mb": 4562.47
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.42,
+              0.44,
+              0.51
+            ],
+            "mean": 0.4566666666666667,
+            "std": 0.03858612300930076
+          },
+          "p3_end": {
+            "seeds": [
+              0.5,
+              0.23,
+              0.45
+            ],
+            "mean": 0.3933333333333333,
+            "std": 0.11728408057172787
+          }
+        }
+      },
+      "gpt2-medium": {
+        "apia_block": {
+          "per_seed": [
+            {
+              "p1_end": 0.15,
+              "p2_end": 0.15,
+              "p3_onset": 0.3,
+              "p3_end": 0.16,
+              "cons": 0
+            },
+            {
+              "p1_end": 0.17,
+              "p2_end": 0.18,
+              "p3_onset": 0.21,
+              "p3_end": 0.15,
+              "cons": 0
+            },
+            {
+              "p1_end": 0.17,
+              "p2_end": 0.19,
+              "p3_onset": 0.29,
+              "p3_end": 0.27,
+              "cons": 0
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.3,
+              0.21,
+              0.29
+            ],
+            "mean": 0.26666666666666666,
+            "std": 0.040276819911981905
+          },
+          "p3_end": {
+            "seeds": [
+              0.16,
+              0.15,
+              0.27
+            ],
+            "mean": 0.19333333333333336,
+            "std": 0.054365021434333645
+          }
+        },
+        "apia_ctxmem": {
+          "per_seed": [
+            {
+              "p1_end": 0.21,
+              "p2_end": 0.2,
+              "p3_onset": 0.35,
+              "p3_end": 0.22,
+              "cons": 6
+            },
+            {
+              "p1_end": 0.17,
+              "p2_end": 0.19,
+              "p3_onset": 0.22,
+              "p3_end": 0.14,
+              "cons": 6
+            },
+            {
+              "p1_end": 0.16,
+              "p2_end": 0.2,
+              "p3_onset": 0.26,
+              "p3_end": 0.2,
+              "cons": 6
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.35,
+              0.22,
+              0.26
+            ],
+            "mean": 0.27666666666666667,
+            "std": 0.054365021434333624
+          },
+          "p3_end": {
+            "seeds": [
+              0.22,
+              0.14,
+              0.2
+            ],
+            "mean": 0.18666666666666668,
+            "std": 0.033993463423951896
+          }
+        },
+        "lora_lr0.001": {
+          "per_seed": [
+            {
+              "p1_end": 0.08,
+              "p2_end": 0.04,
+              "p3_onset": 0.13,
+              "p3_end": 0.49,
+              "ms_per_step": 80.4,
+              "peak_mb": 5729.12
+            },
+            {
+              "p1_end": 0.12,
+              "p2_end": 0.46,
+              "p3_onset": 0.45,
+              "p3_end": 0.5,
+              "ms_per_step": 80.5,
+              "peak_mb": 5729.12
+            },
+            {
+              "p1_end": 0.35,
+              "p2_end": 0.5,
+              "p3_onset": 0.51,
+              "p3_end": 0.47,
+              "ms_per_step": 80.3,
+              "peak_mb": 5729.12
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.13,
+              0.45,
+              0.51
+            ],
+            "mean": 0.36333333333333334,
+            "std": 0.16679994670929071
+          },
+          "p3_end": {
+            "seeds": [
+              0.49,
+              0.5,
+              0.47
+            ],
+            "mean": 0.48666666666666664,
+            "std": 0.012472191289246483
+          }
+        },
+        "lora_lr0.0001": {
+          "per_seed": [
+            {
+              "p1_end": 0.12,
+              "p2_end": 0.06,
+              "p3_onset": 0.09,
+              "p3_end": 0.11,
+              "ms_per_step": 80.4,
+              "peak_mb": 5729.12
+            },
+            {
+              "p1_end": 0.09,
+              "p2_end": 0.06,
+              "p3_onset": 0.15,
+              "p3_end": 0.08,
+              "ms_per_step": 80.2,
+              "peak_mb": 5729.12
+            },
+            {
+              "p1_end": 0.12,
+              "p2_end": 0.04,
+              "p3_onset": 0.22,
+              "p3_end": 0.05,
+              "ms_per_step": 80.3,
+              "peak_mb": 5729.12
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.09,
+              0.15,
+              0.22
+            ],
+            "mean": 0.15333333333333332,
+            "std": 0.053124591501697425
+          },
+          "p3_end": {
+            "seeds": [
+              0.11,
+              0.08,
+              0.05
+            ],
+            "mean": 0.08,
+            "std": 0.02449489742783178
+          }
+        },
+        "lora_lr1e-05": {
+          "per_seed": [
+            {
+              "p1_end": 0.47,
+              "p2_end": 0.63,
+              "p3_onset": 0.42,
+              "p3_end": 0.39,
+              "ms_per_step": 80.4,
+              "peak_mb": 5729.12
+            },
+            {
+              "p1_end": 0.52,
+              "p2_end": 0.49,
+              "p3_onset": 0.46,
+              "p3_end": 0.34,
+              "ms_per_step": 80.5,
+              "peak_mb": 5729.12
+            },
+            {
+              "p1_end": 0.55,
+              "p2_end": 0.53,
+              "p3_onset": 0.53,
+              "p3_end": 0.46,
+              "ms_per_step": 80.3,
+              "peak_mb": 5729.12
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.42,
+              0.46,
+              0.53
+            ],
+            "mean": 0.47000000000000003,
+            "std": 0.04546060565661954
+          },
+          "p3_end": {
+            "seeds": [
+              0.39,
+              0.34,
+              0.46
+            ],
+            "mean": 0.39666666666666667,
+            "std": 0.04921607686744466
+          }
+        }
+      },
+      "gpt2-large": {
+        "apia_block": {
+          "per_seed": [
+            {
+              "p1_end": 0.17,
+              "p2_end": 0.16,
+              "p3_onset": 0.26,
+              "p3_end": 0.18,
+              "cons": 0
+            },
+            {
+              "p1_end": 0.19,
+              "p2_end": 0.28,
+              "p3_onset": 0.23,
+              "p3_end": 0.12,
+              "cons": 0
+            },
+            {
+              "p1_end": 0.15,
+              "p2_end": 0.16,
+              "p3_onset": 0.37,
+              "p3_end": 0.21,
+              "cons": 0
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.26,
+              0.23,
+              0.37
+            ],
+            "mean": 0.2866666666666667,
+            "std": 0.060184900284225955
+          },
+          "p3_end": {
+            "seeds": [
+              0.18,
+              0.12,
+              0.21
+            ],
+            "mean": 0.17,
+            "std": 0.03741657386773942
+          }
+        },
+        "apia_ctxmem": {
+          "per_seed": [
+            {
+              "p1_end": 0.26,
+              "p2_end": 0.25,
+              "p3_onset": 0.37,
+              "p3_end": 0.27,
+              "cons": 6
+            },
+            {
+              "p1_end": 0.19,
+              "p2_end": 0.27,
+              "p3_onset": 0.26,
+              "p3_end": 0.11,
+              "cons": 6
+            },
+            {
+              "p1_end": 0.15,
+              "p2_end": 0.17,
+              "p3_onset": 0.33,
+              "p3_end": 0.24,
+              "cons": 6
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.37,
+              0.26,
+              0.33
+            ],
+            "mean": 0.32,
+            "std": 0.04546060565661952
+          },
+          "p3_end": {
+            "seeds": [
+              0.27,
+              0.11,
+              0.24
+            ],
+            "mean": 0.20666666666666667,
+            "std": 0.06944222218666554
+          }
+        },
+        "lora_lr0.001": {
+          "per_seed": [
+            {
+              "p1_end": 0.41,
+              "p2_end": 0.47,
+              "p3_onset": 0.44,
+              "p3_end": 0.49,
+              "ms_per_step": 173.2,
+              "peak_mb": 7779.66
+            },
+            {
+              "p1_end": 0.59,
+              "p2_end": 0.48,
+              "p3_onset": 0.45,
+              "p3_end": 0.56,
+              "ms_per_step": 172.7,
+              "peak_mb": 7779.66
+            },
+            {
+              "p1_end": 0.51,
+              "p2_end": 0.51,
+              "p3_onset": 0.53,
+              "p3_end": 0.57,
+              "ms_per_step": 173.4,
+              "peak_mb": 7779.66
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.44,
+              0.45,
+              0.53
+            ],
+            "mean": 0.47333333333333333,
+            "std": 0.04027681991198191
+          },
+          "p3_end": {
+            "seeds": [
+              0.49,
+              0.56,
+              0.57
+            ],
+            "mean": 0.54,
+            "std": 0.03559026084010437
+          }
+        },
+        "lora_lr0.0001": {
+          "per_seed": [
+            {
+              "p1_end": 0.04,
+              "p2_end": 0.03,
+              "p3_onset": 0.09,
+              "p3_end": 0.1,
+              "ms_per_step": 173.9,
+              "peak_mb": 7779.66
+            },
+            {
+              "p1_end": 0.05,
+              "p2_end": 0.06,
+              "p3_onset": 0.14,
+              "p3_end": 0.07,
+              "ms_per_step": 173.5,
+              "peak_mb": 7779.66
+            },
+            {
+              "p1_end": 0.04,
+              "p2_end": 0.04,
+              "p3_onset": 0.18,
+              "p3_end": 0.07,
+              "ms_per_step": 173.2,
+              "peak_mb": 7779.66
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.09,
+              0.14,
+              0.18
+            ],
+            "mean": 0.1366666666666667,
+            "std": 0.03681787005729087
+          },
+          "p3_end": {
+            "seeds": [
+              0.1,
+              0.07,
+              0.07
+            ],
+            "mean": 0.08,
+            "std": 0.01414213562373095
+          }
+        },
+        "lora_lr1e-05": {
+          "per_seed": [
+            {
+              "p1_end": 0.45,
+              "p2_end": 0.39,
+              "p3_onset": 0.43,
+              "p3_end": 0.22,
+              "ms_per_step": 173.0,
+              "peak_mb": 7779.66
+            },
+            {
+              "p1_end": 0.29,
+              "p2_end": 0.27,
+              "p3_onset": 0.25,
+              "p3_end": 0.04,
+              "ms_per_step": 172.9,
+              "peak_mb": 7779.66
+            },
+            {
+              "p1_end": 0.24,
+              "p2_end": 0.43,
+              "p3_onset": 0.34,
+              "p3_end": 0.11,
+              "ms_per_step": 173.8,
+              "peak_mb": 7779.66
+            }
+          ],
+          "p3_onset": {
+            "seeds": [
+              0.43,
+              0.25,
+              0.34
+            ],
+            "mean": 0.34,
+            "std": 0.07348469228349534
+          },
+          "p3_end": {
+            "seeds": [
+              0.22,
+              0.04,
+              0.11
+            ],
+            "mean": 0.12333333333333334,
+            "std": 0.07408703590297622
+          }
+        }
+      }
+    }
   }
- }
 }
