@@ -1,0 +1,66 @@
+{
+  "note": "Native APIA char-LM spike, 200k chars tiny-Shakespeare, Kaggle T4, seed 0, single-pass predict-before-update. Full bpc_curve arrays live in the Kaggle run output (/kaggle/working/native_lm_results.json).",
+  "runs": [
+    {
+      "arm": "apia_block",
+      "seed": 0,
+      "n_chars": 200000,
+      "final_bpc": 5.6006,
+      "chars_per_s": 476.03,
+      "wall_s": 420.14,
+      "param_floats": 392359,
+      "learn_state_bytes": 3552576,
+      "peak_vram_mb": 0,
+      "n_consolidations": 0
+    },
+    {
+      "arm": "apia_ctxmem",
+      "seed": 0,
+      "n_chars": 200000,
+      "final_bpc": 5.6306,
+      "chars_per_s": 218.14,
+      "wall_s": 916.86,
+      "param_floats": 392359,
+      "learn_state_bytes": 11541336,
+      "peak_vram_mb": 0,
+      "n_consolidations": 471
+    },
+    {
+      "arm": "gru",
+      "seed": 0,
+      "n_chars": 199936,
+      "ctx": 128,
+      "batch": 32,
+      "final_bpc": 3.9186,
+      "chars_per_s": 69650.03,
+      "wall_s": 2.87,
+      "param_floats": 268161,
+      "learn_state_bytes": 3217932,
+      "peak_vram_mb": 3764,
+      "device": "cuda"
+    },
+    {
+      "arm": "tf",
+      "seed": 0,
+      "n_chars": 199936,
+      "ctx": 128,
+      "batch": 32,
+      "final_bpc": 3.9041,
+      "chars_per_s": 500204.41,
+      "wall_s": 0.40,
+      "param_floats": 429633,
+      "learn_state_bytes": 5155596,
+      "peak_vram_mb": 3773,
+      "device": "cuda"
+    }
+  ],
+  "config": {
+    "chars": 200000,
+    "seed": 0,
+    "ctx": 128,
+    "batch": 32,
+    "lr": 0.001,
+    "reservoir": 512,
+    "n_basis": 10
+  }
+}
