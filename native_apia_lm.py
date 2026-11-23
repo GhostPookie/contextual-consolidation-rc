@@ -162,6 +162,418 @@ def run_apia(stream, vocab, arm, seed, n_res=512, n_basis=10,
         n_consolidations=n_cons)
 
 
+# ---------- numba fast path (fused per-char loop) ----------
+# Same math, same predict-before-update order; removes interpreter
+# overhead and exploits phi's local-support sparsity (degree+1 nnz
+# per reservoir dim). Falls back to the numpy loop if numba absent.
+
+try:
+    from numba import njit
+    _HAVE_NUMBA = True
+except Exception:
+    _HAVE_NUMBA = False
+
+if _HAVE_NUMBA:
+
+    @njit(cache=True)
+    def _basis_nz(x, knots, degree, K, Nbuf, ok, ov):
+        """Scalar Cox-de Boor -> nonzero (basis-idx, val) pairs."""
+        t = knots
+        nt = t.shape[0]
+        xc = x
+        if xc < t[0]:
+            xc = t[0]
+        if xc > t[nt - 1]:
+            xc = t[nt - 1]
+        idx = 0
+        for i in range(nt):
+            if t[i] > xc:
+                break
+            idx = i
+        if idx > nt - 2:
+            idx = nt - 2
+        for i in range(nt - 1):
+            Nbuf[i] = 0.0
+        Nbuf[idx] = 1.0
+        for d in range(1, degree + 1):
+            nb = nt - d - 1
+            for i in range(nb):
+                left = 0.0
+                dl = t[i + d] - t[i]
+                if dl > 0.0:
+                    left = (xc - t[i]) / dl * Nbuf[i]
+                right = 0.0
+                dr = t[i + d + 1] - t[i + 1]
+                if dr > 0.0:
+                    right = (t[i + d + 1] - xc) / dr * Nbuf[i + 1]
+                Nbuf[i] = left + right
+        if xc >= t[nt - 1]:
+            for i in range(nt - 1):
+                Nbuf[i] = 0.0
+            Nbuf[K - 1] = 1.0
+        cnt = 0
+        for k in range(K):
+            v = Nbuf[k]
+            if v != 0.0:
+                ok[cnt] = k
+                ov[cnt] = v
+                cnt += 1
+        return cnt
+
+    @njit(cache=True)
+    def _res_tanh(h, tok, W_in, Wd, Wi, Wp, alpha, tmp):
+        """h <- (1-a)h + a*tanh(W_in[:,tok] + W_res@h); tmp=tanh(h)."""
+        n = h.shape[0]
+        for i in range(n):
+            acc = W_in[i, tok]
+            for p in range(Wp[i], Wp[i + 1]):
+                acc += Wd[p] * h[Wi[p]]
+            tmp[i] = acc
+        for i in range(n):
+            h[i] = (1.0 - alpha) * h[i] + alpha * np.tanh(tmp[i])
+            tmp[i] = np.tanh(h[i])
+
+    @njit(cache=True)
+    def _nb_run_block(tokens, W_in, Wd, Wi, Wp, alpha, knots, degree, K,
+                      W, Pb, Pbias, lam, trace_bound, bias_bound,
+                      eval_every, vocab):
+        """apia_block, fully fused. tokens[t]->predict->update(tokens[t+1])."""
+        D = W_in.shape[0]
+        F = D * K + 1
+        C = vocab
+        n = tokens.shape[0] - 1
+        h = np.zeros(D)
+        tmp = np.zeros(D)
+        Nbuf = np.zeros(knots.shape[0] - 1)
+        ok = np.empty(degree + 3, np.int64)
+        ov = np.empty(degree + 3)
+        jk = np.empty((D, degree + 2), np.int64)
+        jv = np.empty((D, degree + 2))
+        jc = np.empty(D, np.int64)
+        Q = np.empty((D, K))
+        scores = np.empty(C)
+        e = np.empty(C)
+        n_eval = n // eval_every
+        curve = np.empty(n_eval)
+        steps = np.empty(n_eval, np.int64)
+        nll, cnt, nci = 0.0, 0, 0
+        ln2 = np.log(2.0)
+        for t in range(n):
+            _res_tanh(h, tokens[t], W_in, Wd, Wi, Wp, alpha, tmp)
+            for m in range(C):
+                scores[m] = W[F - 1, m]
+            for j in range(D):
+                c = _basis_nz(tmp[j], knots, degree, K, Nbuf, ok, ov)
+                jc[j] = c
+                for z in range(c):
+                    jk[j, z] = ok[z]
+                    jv[j, z] = ov[z]
+                    r = j * K + ok[z]
+                    v = ov[z]
+                    for m in range(C):
+                        scores[m] += v * W[r, m]
+            mx = scores[0]
+            for m in range(1, C):
+                if scores[m] > mx:
+                    mx = scores[m]
+            se = 0.0
+            for m in range(C):
+                se += np.exp(scores[m] - mx)
+            tgt = tokens[t + 1]
+            nll += -np.log(np.exp(scores[tgt] - mx) / se) / ln2
+            cnt += 1
+            for m in range(C):
+                e[m] = -scores[m]
+            e[tgt] += 1.0
+            s = lam + Pbias[0]
+            for j in range(D):
+                for i in range(K):
+                    acc = 0.0
+                    for z in range(jc[j]):
+                        acc += Pb[j, i, jk[j, z]] * jv[j, z]
+                    Q[j, i] = acc
+                for z in range(jc[j]):
+                    s += jv[j, z] * Q[j, jk[j, z]]
+            for j in range(D):
+                for i in range(K):
+                    g = Q[j, i] / s
+                    for m in range(C):
+                        W[j * K + i, m] += g * e[m]
+                    for k in range(K):
+                        Pb[j, i, k] = (Pb[j, i, k] - g * Q[j, k]) / lam
+            gb = Pbias[0] / s
+            for m in range(C):
+                W[F - 1, m] += gb * e[m]
+            Pbias[0] = (Pbias[0] - gb * Pbias[0]) / lam
+            if trace_bound > 0.0:
+                for j in range(D):
+                    tr = 0.0
+                    for i in range(K):
+                        tr += Pb[j, i, i]
+                    if tr > trace_bound:
+                        sc = trace_bound / tr
+                        for i in range(K):
+                            for k in range(K):
+                                Pb[j, i, k] *= sc
+                if bias_bound > 0.0 and Pbias[0] > bias_bound:
+                    Pbias[0] = bias_bound
+            if (t + 1) % eval_every == 0:
+                curve[nci] = nll / cnt
+                steps[nci] = t + 1
+                nci += 1
+                nll, cnt = 0.0, 0
+        return curve[:nci], steps[:nci]
+
+    @njit(cache=True)
+    def _nb_run_ctxmem(tokens, W_in, Wd, Wi, Wp, alpha, knots, degree, K,
+                       W, Pb, Pbias, lam, trace_bound, bias_bound,
+                       W_slow, E, beta, gamma, eta, a_ema, a_fast,
+                       cons_every, e_gate, tau, p_inflate,
+                       cons_counts, eval_every, vocab):
+        """apia_ctxmem fused: 3-slot gated memory, same update order."""
+        D = W_in.shape[0]
+        F = D * K + 1
+        C = vocab
+        S = W_slow.shape[0]
+        n = tokens.shape[0] - 1
+        h = np.zeros(D)
+        tmp = np.zeros(D)
+        Nbuf = np.zeros(knots.shape[0] - 1)
+        ok = np.empty(degree + 3, np.int64)
+        ov = np.empty(degree + 3)
+        jk = np.empty((D, degree + 2), np.int64)
+        jv = np.empty((D, degree + 2))
+        jc = np.empty(D, np.int64)
+        Q = np.empty((D, K))
+        scores = np.empty(C)
+        ss = np.empty((S, C))
+        w = np.empty(S)
+        e = np.empty(C)
+        n_eval = n // eval_every
+        curve = np.empty(n_eval)
+        steps = np.empty(n_eval, np.int64)
+        nll, cnt, nci = 0.0, 0, 0
+        e_fast, m2 = 0.0, 1.0
+        a_m2 = 0.02
+        step_c, n_cons = 0, 0
+        ln2 = np.log(2.0)
+        for t in range(n):
+            _res_tanh(h, tokens[t], W_in, Wd, Wi, Wp, alpha, tmp)
+            for m in range(C):
+                scores[m] = W[F - 1, m]
+            for s_ in range(S):
+                for m in range(C):
+                    ss[s_, m] = 0.0
+            for j in range(D):
+                c = _basis_nz(tmp[j], knots, degree, K, Nbuf, ok, ov)
+                jc[j] = c
+                for z in range(c):
+                    jk[j, z] = ok[z]
+                    jv[j, z] = ov[z]
+                    r = j * K + ok[z]
+                    v = ov[z]
+                    for m in range(C):
+                        scores[m] += v * W[r, m]
+                    for s_ in range(S):
+                        for m in range(C):
+                            ss[s_, m] += v * W_slow[s_, r, m]
+            tgt = tokens[t + 1]
+            # slot errors (slow-only): ||y - beta*ss_s||^2
+            for s_ in range(S):
+                acc = 0.0
+                for m in range(C):
+                    acc += (beta * ss[s_, m]) ** 2
+                acc += (1.0 - beta * ss[s_, tgt]) ** 2 - (
+                    beta * ss[s_, tgt]) ** 2
+                E[s_] = (1.0 - a_ema) * E[s_] + a_ema * acc
+            # gate
+            emin = E[0]
+            for s_ in range(1, S):
+                if E[s_] < emin:
+                    emin = E[s_]
+            if emin < 1e-8:
+                emin = 1e-8
+            zmax = -1e30
+            for s_ in range(S):
+                z = -eta * E[s_] / emin
+                w[s_] = z
+                if z > zmax:
+                    zmax = z
+            wsum = 0.0
+            for s_ in range(S):
+                w[s_] = np.exp(w[s_] - zmax)
+                wsum += w[s_]
+            # full scores = fast + beta*mix(ss)
+            for m in range(C):
+                acc = 0.0
+                for s_ in range(S):
+                    acc += w[s_] * ss[s_, m]
+                scores[m] += beta * acc / wsum
+            mx = scores[0]
+            for m in range(1, C):
+                if scores[m] > mx:
+                    mx = scores[m]
+            se = 0.0
+            for m in range(C):
+                se += np.exp(scores[m] - mx)
+            nll += -np.log(np.exp(scores[tgt] - mx) / se) / ln2
+            cnt += 1
+            # residual update: e = y - scores (gated residual == total)
+            for m in range(C):
+                e[m] = -scores[m]
+            e[tgt] += 1.0
+            s = lam + Pbias[0]
+            for j in range(D):
+                for i in range(K):
+                    acc = 0.0
+                    for z in range(jc[j]):
+                        acc += Pb[j, i, jk[j, z]] * jv[j, z]
+                    Q[j, i] = acc
+                for z in range(jc[j]):
+                    s += jv[j, z] * Q[j, jk[j, z]]
+            for j in range(D):
+                for i in range(K):
+                    g = Q[j, i] / s
+                    for m in range(C):
+                        W[j * K + i, m] += g * e[m]
+                    for k in range(K):
+                        Pb[j, i, k] = (Pb[j, i, k] - g * Q[j, k]) / lam
+            gb = Pbias[0] / s
+            for m in range(C):
+                W[F - 1, m] += gb * e[m]
+            Pbias[0] = (Pbias[0] - gb * Pbias[0]) / lam
+            if trace_bound > 0.0:
+                for j in range(D):
+                    tr = 0.0
+                    for i in range(K):
+                        tr += Pb[j, i, i]
+                    if tr > trace_bound:
+                        sc = trace_bound / tr
+                        for i in range(K):
+                            for k in range(K):
+                                Pb[j, i, k] *= sc
+                if bias_bound > 0.0 and Pbias[0] > bias_bound:
+                    Pbias[0] = bias_bound
+            en = 0.0
+            for m in range(C):
+                en += e[m] * e[m]
+            e_fast = (1.0 - a_fast) * e_fast + a_fast * en
+            m2 = (1.0 - a_m2) * m2 + a_m2 * 1.0
+            step_c += 1
+            if step_c % cons_every == 0 and e_fast <= e_gate * m2:
+                k = 0
+                for s_ in range(1, S):
+                    if E[s_] < E[k]:
+                        k = s_
+                target = -1
+                if E[k] < tau * m2:
+                    target = k
+                else:
+                    cmin = cons_counts[0]
+                    for s_ in range(1, S):
+                        if cons_counts[s_] < cmin:
+                            cmin = cons_counts[s_]
+                    if cmin > 0:
+                        target = -1          # 'refuse' at saturation
+                    else:
+                        target = 0
+                        for s_ in range(1, S):
+                            if cons_counts[s_] < cons_counts[target]:
+                                target = s_
+                if target >= 0:
+                    cf = (1.0 - gamma) / beta
+                    for r in range(F):
+                        for m in range(C):
+                            W_slow[target, r, m] += cf * W[r, m]
+                            W[r, m] *= gamma
+                    for j in range(D):
+                        for i in range(K):
+                            for kk in range(K):
+                                Pb[j, i, kk] *= p_inflate
+                    Pbias[0] *= p_inflate
+                    cons_counts[target] += 1
+                    n_cons += 1
+            if (t + 1) % eval_every == 0:
+                curve[nci] = nll / cnt
+                steps[nci] = t + 1
+                nci += 1
+                nll, cnt = 0.0, 0
+        return curve[:nci], steps[:nci], n_cons
+
+
+def _apia_init(vocab, n_res, n_basis, seed):
+    sub = ReservoirSubstrate(vocab, n_res=n_res, n_basis=n_basis,
+                             seed=seed)
+    rls = BlockDiagRLS(input_dim=n_res, n_basis=n_basis,
+                       n_outputs=vocab, forgetting=0.9995,
+                       init_var=1e2, windup_mult=1e4)
+    csr = sub.res.W_res.tocsr()
+    args = dict(
+        W_in=np.ascontiguousarray(sub.res.W_in),
+        Wd=csr.data.astype(np.float64),
+        Wi=csr.indices.astype(np.int64),
+        Wp=csr.indptr.astype(np.int64),
+        alpha=sub.res.alpha,
+        knots=sub.spline.knots,
+        degree=sub.spline.degree,
+        K=n_basis,
+        W=rls.W,
+        Pb=rls.P_blocks,
+        Pbias=rls.P_bias.reshape(-1),
+        lam=rls.lam,
+        trace_bound=rls.trace_bound or 0.0,
+        bias_bound=rls._bias_bound or 0.0)
+    return sub, rls, args
+
+
+def run_apia_fast(stream, vocab, arm, seed, n_res=512, n_basis=10,
+                  eval_every=2000, verbose=True):
+    """Numba-fused run; identical update order to run_apia."""
+    if not _HAVE_NUMBA:
+        raise RuntimeError("numba unavailable")
+    sub, rls, a = _apia_init(vocab, n_res, n_basis, seed)
+    tok = np.ascontiguousarray(stream.astype(np.int64))
+    t0 = time.perf_counter()
+    if arm == "apia_block":
+        curve, steps = _nb_run_block(
+            tok, a["W_in"], a["Wd"], a["Wi"], a["Wp"], a["alpha"],
+            a["knots"], a["degree"], a["K"], a["W"], a["Pb"],
+            a["Pbias"], a["lam"], a["trace_bound"], a["bias_bound"],
+            eval_every, vocab)
+        n_cons = 0
+    elif arm == "apia_ctxmem":
+        S = 3
+        W_slow = np.zeros((S,) + a["W"].shape)
+        E = np.zeros(S)
+        curve, steps, n_cons = _nb_run_ctxmem(
+            tok, a["W_in"], a["Wd"], a["Wi"], a["Wp"], a["alpha"],
+            a["knots"], a["degree"], a["K"], a["W"], a["Pb"],
+            a["Pbias"], a["lam"], a["trace_bound"], a["bias_bound"],
+            W_slow, E, 1.0, 0.1, 5.0, 0.05, 0.1, 250, 1.0, 0.5, 1.5,
+            np.zeros(S, np.int64), eval_every, vocab)
+        a["W_slow"] = W_slow
+    else:
+        raise ValueError(arm)
+    dt = time.perf_counter() - t0
+    n = len(stream) - 1
+    tail = list(curve)[max(0, len(curve) - 5):]
+    W = rls.get_weights()
+    state_bytes = (sub.state_bytes + W.nbytes
+                   + rls.P_blocks.nbytes + rls.P_bias.nbytes
+                   + a.get("W_slow", np.empty(0)).nbytes)
+    if verbose:
+        print(f"  {arm} done {dt:.0f}s", flush=True)
+    return dict(
+        arm=arm, seed=seed, n_chars=n,
+        final_bpc=float(np.mean(tail)),
+        bpc_curve=[float(v) for v in curve],
+        curve_steps=[int(v) for v in steps],
+        chars_per_s=float(n / dt), wall_s=float(dt),
+        param_floats=int(sub.param_floats + W.size),
+        learn_state_bytes=int(state_bytes),
+        peak_vram_mb=0, n_consolidations=int(n_cons))
+
+
 # ---------- torch baselines ----------
 
 def run_torch(stream, vocab, kind, seed, chars_ctx=128, batch=32,
@@ -248,6 +660,98 @@ def run_torch(stream, vocab, kind, seed, chars_ctx=128, batch=32,
         peak_vram_mb=int(peak), device=dev)
 
 
+def run_torch_online(stream, vocab, kind, seed, chars_ctx=128, lr=1e-3,
+                     eval_every=2000, verbose=True):
+    """B=1 online regime — same cadence as the APIA arms: every step
+    sees ONE sample, loss logged BEFORE optimizer.step, single pass.
+    Backprop stays (it IS torch's learning rule); what we equalize is
+    cadence (batch=1, per-step update), not the rule.
+    gru_b1: stateful GRU, hidden carried + detached (TBPTT-1).
+    tf_b1 : sliding ctx-window, forward+backward per step."""
+    import torch
+    import torch.nn as nn
+    dev = "cuda" if torch.cuda.is_available() else "cpu"
+    torch.manual_seed(seed)
+
+    if kind == "gru_b1":
+        class M(nn.Module):
+            def __init__(s):
+                super().__init__()
+                s.emb = nn.Embedding(vocab, 64)
+                s.rnn = nn.GRU(64, 256, 1, batch_first=True)
+                s.head = nn.Linear(256, vocab)
+            def forward(s, x, h):
+                h, _ = s.rnn(s.emb(x), h)
+                return s.head(h[:, -1]), h.detach()
+    else:
+        class M(nn.Module):
+            def __init__(s):
+                super().__init__()
+                s.emb = nn.Embedding(vocab, 128)
+                s.pos = nn.Embedding(chars_ctx, 128)
+                layer = nn.TransformerEncoderLayer(
+                    128, 4, 512, dropout=0.0, batch_first=True,
+                    norm_first=True)
+                s.tr = nn.TransformerEncoder(layer, 2)
+                s.head = nn.Linear(128, vocab)
+                s.register_buffer(
+                    "mask", torch.triu(torch.ones(
+                        chars_ctx, chars_ctx, dtype=torch.bool), 1))
+            def forward(s, x):
+                e = s.emb(x) + s.pos.weight[:x.size(1)]
+                o = s.tr(e, mask=s.mask[:x.size(1), :x.size(1)],
+                         is_causal=True)
+                return s.head(o[:, -1])
+    mdl = M().to(dev)
+    opt = torch.optim.AdamW(mdl.parameters(), lr=lr)
+    lossf = nn.CrossEntropyLoss()
+    n_par = sum(p.numel() for p in mdl.parameters())
+    x = torch.from_numpy(stream).to(dev)
+
+    T = len(stream) - 1
+    losses, steps = [], []
+    nll, cnt = 0.0, 0
+    hid = None
+    ln2 = float(np.log(2.0))
+    t0 = time.perf_counter()
+    if dev == "cuda":
+        torch.cuda.reset_peak_memory_stats()
+    for t in range(T):
+        if kind == "gru_b1":
+            xin = x[t:t + 1].view(1, 1)
+            logits, hid = mdl(xin, hid)
+        else:
+            lo = max(0, t + 1 - chars_ctx)
+            xin = x[lo:t + 1].view(1, -1)
+            logits = mdl(xin)
+        y = x[t + 1:t + 2]
+        loss = lossf(logits, y)
+        nll += float(loss.detach()) / ln2
+        cnt += 1
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+        if (t + 1) % eval_every == 0:
+            losses.append(nll / cnt)
+            steps.append(t + 1)
+            nll, cnt = 0.0, 0
+            if verbose and len(losses) % 5 == 0:
+                print(f"  {kind} t={t+1} bpc={losses[-1]:.3f}",
+                      flush=True)
+    dt = time.perf_counter() - t0
+    peak = (torch.cuda.max_memory_allocated() // 2**20
+            if dev == "cuda" else 0)
+    tail = losses[max(0, len(losses) - 5):]
+    return dict(
+        arm=kind, seed=seed, n_chars=T, ctx=chars_ctx, batch=1,
+        final_bpc=float(np.mean(tail)),
+        bpc_curve=[float(v) for v in losses], curve_steps=steps,
+        chars_per_s=float(T / dt), wall_s=float(dt),
+        param_floats=int(n_par),
+        learn_state_bytes=int(n_par * 4 * 3),  # W + grad + 2x Adam
+        peak_vram_mb=int(peak), device=dev)
+
+
 # ---------- driver ----------
 
 def existing(results, arm, seed):
@@ -259,13 +763,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arm", default="all",
                     choices=["all", "apia_block", "apia_ctxmem",
-                             "gru", "tf"])
+                             "gru", "tf", "gru_b1", "tf_b1"])
     ap.add_argument("--chars", type=int, default=300_000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--ctx", type=int, default=128)
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--fast", type=int, default=1,
+                    help="use numba fused loop for apia arms (default on)")
     ap.add_argument("--out", default="native_lm_results.json")
     a = ap.parse_args()
 
@@ -290,7 +796,12 @@ def main():
             continue
         print(f"== {arm} s{a.seed}")
         if arm.startswith("apia"):
-            r = run_apia(stream, vocab, arm, a.seed)
+            fn = (run_apia_fast if (a.fast and _HAVE_NUMBA)
+                  else run_apia)
+            r = fn(stream, vocab, arm, a.seed)
+        elif arm.endswith("_b1"):
+            r = run_torch_online(stream, vocab, arm, a.seed,
+                                 chars_ctx=a.ctx, lr=a.lr)
         else:
             r = run_torch(stream, vocab, arm, a.seed,
                           chars_ctx=a.ctx, batch=a.batch, lr=a.lr)
