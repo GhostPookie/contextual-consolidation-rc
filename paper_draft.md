@@ -614,7 +614,7 @@ baseline to printed precision.}
 
 Table 4 tests whether the mechanism generalizes beyond the benchmark it
 was tuned on. On NARMA-10→MG-17→NARMA-10 the slots discriminate
-correctly ([0,1,0] in 3/5 seeds) yet the gain is modest (×1.05) because
+correctly ([0,1,0] in 3/5 seeds) yet the gain is modest (×1.04) because
 NARMA-10 is cheap to relearn on this reservoir — baseline onset already
 nearly equals end error (0.108 vs 0.106), leaving little margin to
 recover; the $\mu^2$ term in $\widehat{m_2}$ also weakens context
@@ -630,7 +630,7 @@ Together with the main protocol, the three tasks establish a
 **cost-proportional benefit** property: the memory pays nothing when
 there is nothing to protect, and gains most where forgetting is
 expensive (sine↔square: ×4.40). The worst observed regression for
-the *final* mechanism across all experiments is one NARMA seed at 14%
+the *final* mechanism across all experiments is one NARMA seed at 20%
 (intermediate ablation variants reach +20%; the refuse saturation
 policy costs +6% — harmlessness holds while drainage is active and
 slot demand fits capacity, see Sec. 4.6).
@@ -846,7 +846,7 @@ sensor scale or a slow online estimate — the mechanism itself is
 agnostic to this choice. Finally, the task battery covers three
 dynamical families; behavior on genuinely stochastic or
 high-dimensional streams is untested, and the worst observed single-seed
-regression for the final mechanism is 14% (NARMA test), while the
+regression for the final mechanism is 20% (NARMA test), while the
 intermediate norm-proxy variant degraded single seeds by up to 20%.
 
 **Future work.** The remaining onset error is attributable to gate

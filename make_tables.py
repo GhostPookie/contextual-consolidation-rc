@@ -37,7 +37,7 @@ CANON = {
     't4_mg_ctx': '1.38e-2', 't4_mg_gain': '1.01',
     't4_mg_slots': '[0,0,0] 5/5',
     't4_na_block': '0.108', 't4_na_mh': '0.108',
-    't4_na_ctx': '0.103', 't4_na_gain': '1.05',
+    't4_na_ctx': '0.104', 't4_na_gain': '1.04',
     't4_na_slots': '[0,1,0] 3/5',
     # Table 5: the 4-regime 'block+clamp' run was measured in a
     # separate output (no such config in the valve/saturation npz's)
