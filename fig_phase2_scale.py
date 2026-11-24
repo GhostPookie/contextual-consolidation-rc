@@ -25,14 +25,18 @@ def _lora(m):
     d = D[m]["lora"]
     return d if "p3_onset" in d else d["lr_1e-3"]  # headline = same lr
 
+def _lora_field(m, f):
+    e = _lora(m)
+    return e[f] if f in e else D[m]["lora"][f]
+
 lora_on = [_lora(m)["p3_onset"] for m in MODELS]
-lora_vr = [D[m]["lora"]["vram_mb"] for m in MODELS]
-lora_ms = [D[m]["lora"]["ms_per_step"] for m in MODELS]
+lora_vr = [_lora_field(m, "vram_mb") for m in MODELS]
+lora_ms = [_lora_field(m, "ms_per_step") for m in MODELS]
 tuned_on = D[MODELS[1]]["lora"]["lr_1e-4"]["p3_onset"]
 
-plt.rcParams.update({"font.family": "serif", "font.size": 10,
+plt.rcParams.update({"font.family": "serif", "font.size": 12,
                      "axes.grid": True, "grid.alpha": 0.3})
-fig, ax = plt.subplots(1, 3, figsize=(13, 3.6))
+fig, ax = plt.subplots(1, 3, figsize=(10.5, 3.8))
 
 ax[0].plot(x, apia_on, "o-", color="tab:blue", lw=2,
            label="APIA (no lr, zero retune)")
@@ -41,18 +45,18 @@ ax[0].plot(x, lora_on, "s--", color="tab:red", lw=2,
 ax[0].plot(1, tuned_on, "*", ms=14, color="tab:green",
            label="LoRA tuned (lr=1e-4)")
 ax[0].axhline(0.5, color="gray", ls=":", lw=1)
-ax[0].annotate("chance", (2.05, 0.5), fontsize=8, color="gray",
-               va="center")
+ax[0].annotate("chance", (1.97, 0.44), fontsize=10, color="gray",
+               va="center", ha="right")
 ax[0].set_ylabel("phase-3 onset error")
 ax[0].set_ylim(0, 0.6)
-ax[0].legend(fontsize=8, loc="upper left")
+ax[0].legend(fontsize=9.5, loc="upper left")
 
 ax[1].plot(x, apia_vr, "o-", color="tab:blue", lw=2, label="APIA")
 ax[1].plot(x, lora_vr, "s--", color="tab:red", lw=2, label="LoRA")
 ax[1].axhline(6144, color="k", ls=":", lw=1)
-ax[1].annotate("6 GB", (0.05, 6300), fontsize=8, color="k")
+ax[1].annotate("6 GB", (0.05, 6300), fontsize=10, color="k")
 ax[1].set_ylabel("peak VRAM (MB, batch-1)")
-ax[1].legend(fontsize=8, loc="upper left")
+ax[1].legend(fontsize=9.5, loc="upper left")
 
 ax[2].semilogy(x, apia_ms, "o-", color="tab:blue", lw=2, label="APIA")
 ax[2].semilogy(x, lora_ms, "s--", color="tab:red", lw=2,
@@ -63,5 +67,5 @@ for a in ax:
 fig.suptitle("Scale sweep on the domain-return protocol "
              "(20news A-B-A', single pass)", y=1.03)
 fig.tight_layout()
-fig.savefig("fig_phase2_scale.png", dpi=300, bbox_inches="tight")
+fig.savefig("fig_phase2_scale.png", dpi=165, bbox_inches="tight")
 print("wrote fig_phase2_scale.png")
