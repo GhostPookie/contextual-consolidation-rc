@@ -7,7 +7,7 @@ A fixed Echo State Network reservoir (ESP-constrained) feeds a
 cubic B-spline feature map and a block-diagonal online RLS readout.
 A dual-rate contextual memory — one ungated fast weight channel plus
 S gated slow slots — consolidates regime-specific knowledge under
-write protection, cutting regime-return onset error ~4.8x versus the
+write protection, cutting regime-return onset error ~4.4x versus the
 memoryless baseline (10 seeds, sine->square->sine protocol).
 
 All learning is local and online: no backpropagation, no replay
@@ -27,8 +27,8 @@ S gated slow slots consolidate under write protection.
 ![Regime-return error trajectory](fig3_error_trajectory.png)
 
 When the stream returns to sine after a square-wave regime, the
-contextual memory's onset NMSE is ~4.8x lower than the memoryless
-block baseline (0.096 vs 0.459, mean over 10 seeds).
+contextual memory's onset NMSE is ~4.4x lower than the memoryless
+block baseline (0.104 vs 0.459, mean over 10 seeds).
 
 ![Ablation summary](fig5_ablation_bar.png)
 

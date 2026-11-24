@@ -33,12 +33,12 @@ poisoned slots mislead error-based targeting; and weight norms are
 unreliable occupancy proxies. The resulting mechanism ---
 fast-weight-free slot errors, thresholded write protection, and
 consolidation-count targeting --- reduces return-onset NMSE from \blockOnset{} to
-\ctxOnset{} (\(\times\)\headlineRatio, 10/10 seeds, Wilcoxon \(p<10^{-3}\); robust across
+0.104 (×4.40, 10/10 seeds, Wilcoxon \(p<10^{-3}\); robust across
 100/250/500-step onset windows) on a sine→square→sine protocol,
 outperforms the closest prior reservoir approach --- competitive
 multi-head readouts --- by ×4.4 in its published form and by \(\times\)\residualRatio{}
 against a variant strengthened with our allocation trigger and
-normalized gate (\ctxOnset{} vs \mhOnset/\mhAllocSoft),
+normalized gate (0.104 vs 0.424/0.291),
 passivates harmlessly when regimes are
 indistinguishable (×1.01), and transfers to NARMA-10/Mackey--Glass
 tasks with gains proportional to forgetting cost. Under slot overload,
@@ -114,7 +114,7 @@ with measured evidence.
 \item
   Evidence of \emph{cost-proportional benefit}: on the
   sine→square→sine protocol the mechanism reduces return-onset
-  NMSE \(\times\)\headlineRatio{} (10/10 seeds, Wilcoxon \(p<10^{-3}\)); on
+  NMSE ×4.40 (10/10 seeds, Wilcoxon \(p<10^{-3}\)); on
   dissimilar NARMA-10/Mackey--Glass alternation slots discriminate
   correctly in 3/5 seeds with modest gain (×1.05); and on
   near-identical regimes the mechanism passivates with no measured
@@ -383,7 +383,7 @@ magnitudes (square-regime weights had \(\approx 4\)× the norm of sine-regime
 weights), so the norm heuristic mistargets writes --- in our runs a
 single square-regime consolidation outweighed seven sine consolidations
 and contaminated the protected slot (empirically: norm-protected v2
-improved 7/10 seeds but degraded 3/10 by up to 25\%, Sec. 4.4). We
+improved 8/10 seeds but degraded 2/10 by up to 20\%, Sec. 4.4). We
 instead track
 consolidation counts \(c_i\) and select
 \(\arg\min_i c_i\), a regime-neutral occupancy measure. This both picks the
@@ -524,11 +524,11 @@ evaluation scale (Sec. 4.1).}
 \end{table}
 
 Table~\ref{tab:table2} reports 10 seeds. The contextual memory reduces return-onset
-NMSE from \(\blockOnset\pm0.22\) to \(\ctxOnset\pm0.02\) --- a \textbf{4.76× improvement,
+NMSE from \(\blockOnset\pm0.22\) to 0.104\(\pm0.02\) --- a \textbf{4.40× improvement,
 positive in 10/10 seeds} (range 0.067--0.128 vs.~baseline 0.18--0.91;
 worst case 0.913→0.081). The gain is not an artifact of the window
 definition: at onset windows 100/250/500 the improvements are
-×5.13/\(\times\)\headlineRatio/×4.91. The closest prior approach --- three competitive
+×4.41/×4.40/×4.66. The closest prior approach --- three competitive
 RLS heads selected by EMA error (Bereska-style passive protection) ---
 achieves only \mhOnset{} and is \emph{bit-identical} to the memoryless baseline
 in 9/10 seeds --- its protection mechanism never engages; in the single
@@ -545,26 +545,25 @@ phase 2, \(E_{\min}>\tau\widehat{m_2}\) routes writes to new slots.
 To isolate this channel we augmented the competitor with
 write-triggered allocation (\emph{MultiHead+alloc}: a never-updated head
 is selected when \(E_{\min}>\tau\widehat{m_2}\), same \(\tau\)): it
-recovers part of the gap (\(\mhOnset\to\mhAllocOnset\), improving substantially
+recovers part of the gap (\(0.424\to0.377\), improving substantially
 the seeds where the gate floor had blocked allocation --- 1, 6, 8 ---
 and marginally seed 7).
 Next we port the normalized soft gate itself (relative errors
 \(E_i/\max(E_{\min},\epsilon)\), \(\eta{=}2\), mixture prediction with
-winner-only updates): \emph{MultiHead+alloc+soft} reaches \(\mhAllocSoft\),
+winner-only updates): \emph{MultiHead+alloc+soft} reaches \(0.291\),
 i.e.~the two borrowed components account for
-\(\mhOnset\to\mhAllocSoft\approx\times1.6\) of the competitor's gap. The
+\(0.424\to0.291\approx\times1.5\) of the competitor's gap. The
 remaining \(\approx 2.8\)× to CTX cannot come from gating --- the
 competitor has no ungated channel to manage --- and is therefore
 attributable to the dual-rate transfer architecture itself
 (damped fast weights plus continuity-preserving consolidation).
 Decomposition caveat: these two interventions are not orthogonal
-(soft gating alone yields 0.303), so we report the laddered
+(soft gating alone yields 0.323), so we report the laddered
 rather than a factorial attribution. Note the trigger is not free:
-early allocation slightly degraded three seeds
-(2: \(0.312\to0.317\), +1.7\%; 4: 0.666\(\to0.679\), +2.0\%;
-9: \(0.385\to0.408\), +6.1\%). A Wilcoxon signed-rank test confirms
+early allocation slightly degraded two seeds
+(2: \(0.312\to0.314\), +0.8\%; 9: 0.385\(\to0.408\), +6.1\%). A Wilcoxon signed-rank test confirms
 significance (one-sided Wilcoxon signed-rank, \(W{=}55\),
-\(p{=}9.8\times10^{-4}\); paired \(t_{9}{=}4.85\), \(p{=}9.1\times10^{-4}\);
+\(p{=}9.8\times10^{-4}\); paired \(t_{9}{=}4.71\), \(p{=}1.1\times10^{-3}\);
 the prespecified primary endpoint is phase-3 onset NMSE at the 250-step
 window). The naive dual memory is
 statistically indistinguishable from baseline (\naiveOnset), confirming that
@@ -645,15 +644,15 @@ documented failure mode --- while Table~\ref{tab:table3b} is the separate
 \end{table}
 
 The v1→v2 comparison carries the subtle finding: the norm proxy's
-average gain is \emph{not significant} (one-sided Wilcoxon \(W{=}40\),
-\(p{=}0.116\)) and comes with targeted regressions --- 7/10 seeds
-improved, yet seeds 0, 5 and 7 degraded (worst: seed 0,
-0.139→0.173, +25\%; seed 5: 0.244→0.296, +21\%)
+average gain is \emph{not significant} (one-sided Wilcoxon \(W{=}43\),
+\(p{=}0.065\)) and comes with targeted regressions --- 8/10 seeds
+improved, yet seeds 0 and 5 degraded (worst: seed 0,
+0.147→0.176, +20\%; seed 5: 0.258→0.303, +18\%)
 because a wrongly chosen slot is \emph{preserved} rather than overwritten.
 In other words, a bad oracle turns protection into a \emph{gamble}; a
 correct oracle turns it into a \emph{guarantee}: occupancy counts beat the
 norm variant in 10/10 seeds (Wilcoxon \(p{<}10^{-3}\)), improve the mean
-(0.183→\ctxOnset), and cut dispersion threefold (std 0.06→0.02). The
+(0.187→0.104), and cut dispersion threefold (std 0.07→0.02). The
 statistical picture is consistent with that reading: the two
 mechanism repairs are each individually significant (v0→v1 and
 v2→v3, both \(p{<}10^{-3}\) and surviving a Holm correction across the
@@ -689,9 +688,9 @@ reason as in Sec. 4.3.
 Together with the main protocol, the three tasks establish a
 \textbf{cost-proportional benefit} property: the memory pays nothing when
 there is nothing to protect, and gains most where forgetting is
-expensive (sine\(\leftrightarrow\)square: \(\times\)\headlineRatio). The worst observed regression for
+expensive (sine\(\leftrightarrow\)square: ×4.40). The worst observed regression for
 the \emph{final} mechanism across all experiments is one NARMA seed at 14\%
-(intermediate ablation variants reach +25\%; the refuse saturation
+(intermediate ablation variants reach +20\%; the refuse saturation
 policy costs +6\% --- harmlessness holds while drainage is active and
 slot demand fits capacity, see Sec. 4.6).
 
@@ -756,12 +755,12 @@ mechanism's own consolidation events (180 events pooled over the same
 metric. On sine→square→sine, clamping a memoryless baseline recovers
 part of the headline gain (\blockOnset→\clampOnlyOnset, \(\times2.07\),
 \(p{=}0.003\)), but the stored context still contributes a further
-\(\times2.30\) (\clampOnlyOnset→\ctxOnset, \(p{=}0.001\)). So the \(\times4.76\)
+\(\times2.13\) (\clampOnlyOnset→0.104, \(p{=}0.001\)). So the \(\times4.40\)
 improvement factors into roughly equal components: fast-channel
-drainage (\(\times2.07\)) and gated slot content (\(\times2.30\)). Like
+drainage (\(\times2.07\)) and gated slot content (\(\times2.13\)). Like
 the competitor ladder above, this is a \emph{laddered} (order-dependent)
 decomposition: the second step both removes the lossy cap and adds
-slots plus lossless transfer, so \(\times2.30\) is an upper bound on
+slots plus lossless transfer, so \(\times2.13\) is an upper bound on
 the memory component alone.
 
 Crucially, the two drainage styles are not equivalent. A hard norm
@@ -777,7 +776,7 @@ the norm?'': a cap is a lossy valve, consolidation is a lossless one.
 \begin{table}[t]
 \centering\small
 \caption{Drainage control on the main protocol, 10 seeds. The norm
-cap alone recovers $\times 2.07$; gated memory a further $\times 2.30$;
+cap alone recovers $\times 2.07$; gated memory a further $\times 2.13$;
 but the lossy cap destroys end-phase accuracy while transfer does
 not.}
 \label{tab:table6}
@@ -914,7 +913,7 @@ agnostic to this choice. Finally, the task battery covers three
 dynamical families; behavior on genuinely stochastic or
 high-dimensional streams is untested, and the worst observed single-seed
 regression for the final mechanism is 14\% (NARMA test), while the
-intermediate norm-proxy variant degraded single seeds by up to 25\%.
+intermediate norm-proxy variant degraded single seeds by up to 20\%.
 
 \textbf{Future work.} The remaining onset error is attributable to gate
 transition latency and residual fast-weight interference; gating the
@@ -945,7 +944,7 @@ We have presented a backpropagation-free contextual memory for
 online reservoir prediction whose every component is justified by a
 measured failure of a simpler mechanism. On the standard
 sine→square→sine regime protocol the system reduces return-onset
-NMSE \(\times\)\headlineRatio{} with statistical significance across 10 seeds, while
+NMSE ×4.40 with statistical significance across 10 seeds, while
 remaining harmless where there is nothing to protect. The
 engineering takeaway is that continual learning in linear readouts
 does not require gradients, buffers, or Fisher estimates --- it
@@ -1105,8 +1104,7 @@ Aggregated metrics are emitted to \url{metrics.json}; per-seed arrays to
 \url{fig_data.npz}, \url{saturation_data.npz}, \url{valve_data.npz}, and
 \url{clamp_control.json}, from which every table and figure in this
 paper is generated. Code and data are publicly available at
-\url{https://github.com/GhostPookie/contextual-consolidation-rc}
-(archived at doi:10.5281/zenodo.24448925);
+\url{https://github.com/GhostPookie/contextual-consolidation-rc};
 hardware and software versions are listed in Sec. 4.1.
 
 \end{document}

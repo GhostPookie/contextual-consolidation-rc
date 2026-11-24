@@ -59,11 +59,18 @@ class MultiHeadMemory:
         self.slot_log = []
 
     def update(self, phi, y):
-        # EMA error of each head (before updating, causal)
+        # CAUSAL ORDER: selection + reported prediction use E from
+        # history only; per-head errors vs the current y are folded
+        # into the EMA only AFTER the prediction is committed (the
+        # previous order leaked the current target into the gate).
+        head_errs = np.empty(self.n_slots)
         for i, h in enumerate(self.heads):
             e_i = y - h.predict(phi)
-            self.E[i] = ((1 - self.alpha_ema) * self.E[i]
-                         + self.alpha_ema * float(np.sum(e_i * e_i)))
+            head_errs[i] = float(np.sum(e_i * e_i))
+        # The reported error must be the actual prediction error: in
+        # soft_predict the mixture (pre-update, causal), in hard mode
+        # the winner's.
+        e_rep = (y - self.predict(phi)) if self.soft_predict else None
         self._m2 = ((1 - self.alpha_m2) * self._m2
                     + self.alpha_m2 * float(np.sum(y * y)))
         k = int(np.argmin(self.E))
@@ -73,11 +80,9 @@ class MultiHeadMemory:
             k = int(np.argmin(self.upd_counts))
         self.slot_log.append(k)
         self.upd_counts[k] += 1
-        # The reported error must be the actual prediction error: in
-        # soft_predict the mixture (pre-update, causal), in hard mode
-        # the winner's.
-        e_rep = (y - self.predict(phi)) if self.soft_predict else None
         ret = self.heads[k].update(phi, y)
+        self.E = ((1 - self.alpha_ema) * self.E
+                  + self.alpha_ema * head_errs)
         return e_rep if e_rep is not None else ret
 
     def predict(self, phi):

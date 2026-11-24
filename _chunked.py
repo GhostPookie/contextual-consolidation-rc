@@ -109,6 +109,7 @@ def _nb_ctxmem_c(tokens, W_in, Wd, Wi, Wp, alpha, knots, degree, K,
     ss = np.empty((S, C))
     w = np.empty(S)
     e = np.empty(C)
+    se_buf = np.empty(S)
     nll, cnt = 0.0, 0
     e_fast, m2, step_c = st[0], st[1], st[2]
     nf, ns_, cooldown = st[3], st[4], st[5]
@@ -144,7 +145,10 @@ def _nb_ctxmem_c(tokens, W_in, Wd, Wi, Wp, alpha, knots, degree, K,
             for m in range(C):
                 se_s += np.exp(ss[s_, m] - mx_s)
             acc = mx_s - ss[s_, tgt] + np.log(se_s)
-            E[s_] = (1.0 - a_ema) * E[s_] + a_ema * acc
+            se_buf[s_] = acc
+        # CAUSAL ORDER: the gate must see E built from history only;
+        # the current target's per-slot NLL (se_buf) is folded into E
+        # after the prediction is scored, not before the gate.
         emin = E[0]
         for s_ in range(1, S):
             if E[s_] < emin:
@@ -189,6 +193,8 @@ def _nb_ctxmem_c(tokens, W_in, Wd, Wi, Wp, alpha, knots, degree, K,
             se += np.exp(scores[m] - mx)
         nll += -np.log(np.exp(scores[tgt] - mx) / se) / ln2
         cnt += 1
+        for s_ in range(S):
+            E[s_] = (1.0 - a_ema) * E[s_] + a_ema * se_buf[s_]
         for m in range(C):
             e[m] = -scores[m]
         e[tgt] += 1.0

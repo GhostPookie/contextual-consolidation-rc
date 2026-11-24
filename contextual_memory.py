@@ -162,14 +162,23 @@ class ContextualMemory:
         return self.model.predict(phi) + self._slow_mix(phi, self._gate())
 
     def update(self, phi, y):
-        # 1) Context-match errors (pure W_slow, no W_fast)
-        self.E = ((1 - self.alpha_ema) * self.E
-                  + self.alpha_ema * self._slot_errors(phi, y))
+        # 1) CAUSAL ORDER: the gate must be computed from slot-error
+        #    statistics that exclude the current target. _slot_errors is
+        #    evaluated now (same values it would have anywhere in this
+        #    step: err_mode='slow' reads W_slow only; 'total' reads
+        #    pre-update W_fast) but folded into E only AFTER the
+        #    prediction is issued — otherwise w would depend on y.
+        slot_errs = self._slot_errors(phi, y)
 
-        # 2) Update W_fast on the GATED residual target
+        # 2) Gate on stale E, then update W_fast on the GATED residual
         w = self._gate()
         residual = y - self._slow_mix(phi, w)
         e_total = self.model.update(phi, residual)
+
+        # 3) Now that the prediction is committed, fold the observed
+        #    context-match errors into the slot EMA.
+        self.E = ((1 - self.alpha_ema) * self.E
+                  + self.alpha_ema * slot_errs)
 
         # 3) Fast EMA for the trigger + online E[y^2] for signal energy
         e_now = float(np.sum(e_total ** 2))

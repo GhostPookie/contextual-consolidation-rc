@@ -1,0 +1,14 @@
+{
+ "id": "ghostsa/apia-p1-battery",
+ "title": "apia-p1-battery",
+ "code_file": "script.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": true,
+ "enable_gpu": false,
+ "enable_tpu": false,
+ "enable_internet": true,
+ "dataset_sources": [],
+ "competition_sources": [],
+ "kernel_sources": []
+}

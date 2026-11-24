@@ -22,8 +22,8 @@ def chk(name, got, want, tol=0.01):
 
 # --- headline ---
 chk('block onset mean', float(np.mean(f['onset_block'])), 0.459)
-chk('ctx onset mean', float(np.mean(f['onset_ctx_v3'])), 0.096)
-chk('headline ratio', float(np.mean(f['onset_block'])/np.mean(f['onset_ctx_v3'])), 4.76, 0.02)
+chk('ctx onset mean', float(np.mean(f['onset_ctx_v3'])), 0.104)
+chk('headline ratio', float(np.mean(f['onset_block'])/np.mean(f['onset_ctx_v3'])), 4.40, 0.02)
 chk('ctx f3-end', m['phase_end']['ctx_v3']['f3']['mean'], 0.037, 0.1)
 chk('block f3-end', m['phase_end']['block']['f3']['mean'], 0.010, 0.15)
 chk('end-penalty ratio', m['phase_end']['ctx_v3']['f3']['mean']/m['phase_end']['block']['f3']['mean'], 3.6, 0.1)
@@ -31,22 +31,22 @@ chk('end-penalty ratio', m['phase_end']['ctx_v3']['f3']['mean']/m['phase_end']['
 # --- ablation (Table 3a) ---
 chk('naive', float(np.mean(f['onset_naive'])), 0.455)
 chk('v0', float(np.mean(f['onset_ctx_v0'])), 0.455)
-chk('v1', float(np.mean(f['onset_ctx_v1'])), 0.204)
-chk('v2 mean', float(np.mean(f['onset_ctx_v2'])), 0.183)
-chk('v2 worst regression', float(np.max((f['onset_ctx_v2']-f['onset_ctx_v1'])/f['onset_ctx_v1'])), 0.25, 0.05)
+chk('v1', float(np.mean(f['onset_ctx_v1'])), 0.216)
+chk('v2 mean', float(np.mean(f['onset_ctx_v2'])), 0.187)
+chk('v2 worst regression', float(np.max((f['onset_ctx_v2']-f['onset_ctx_v1'])/f['onset_ctx_v1'])), 0.20, 0.05)
 
 # --- competitor (Table 3b) ---
 chk('multihead', float(np.mean(f['onset_multihead'])), 0.422)
-chk('mh_alloc', float(np.mean(f['onset_mh_alloc'])), 0.369)
-chk('mh_soft', c['mh_soft']['onset_mean'], 0.303)
-chk('mh_alloc_soft', c['mh_alloc_soft']['onset_mean'], 0.268)
+chk('mh_alloc', float(np.mean(f['onset_mh_alloc'])), 0.377)
+chk('mh_soft', c['mh_soft']['onset_mean'], 0.323)
+chk('mh_alloc_soft', c['mh_alloc_soft']['onset_mean'], 0.291)
 chk('residual ratio', c['mh_alloc_soft']['onset_mean']/np.mean(f['onset_ctx_v3']), 2.8, 0.03)
 chk('mh identical seeds', float(np.mean(np.isclose(f['onset_multihead'], f['onset_block'], atol=1e-3))*10), 9, 0)
 
 # --- valve / clamp (Tables 5-6) ---
 chk('block+clamp onset', c['block_clamp']['onset_mean'], 0.222)
 chk('clamp-only ratio', np.mean(f['onset_block'])/c['block_clamp']['onset_mean'], 2.07, 0.03)
-chk('memory-beyond-clamp', c['block_clamp']['onset_mean']/np.mean(f['onset_ctx_v3']), 2.30, 0.03)
+chk('memory-beyond-clamp', c['block_clamp']['onset_mean']/np.mean(f['onset_ctx_v3']), 2.13, 0.03)
 chk('clamp f3-end', c['block_clamp']['f3_end_mean'], 0.40, 0.05)
 chk('refuse onset', float(np.mean(v['onset_r'])), 0.073, 0.1)
 chk('overwrite onset', float(np.mean(v['onset_o'])), 0.016, 0.1)
