@@ -25,20 +25,20 @@ B-spline oznitelik haritasi (K=10, D*K+1=1001 oznitelik) + cevrimici RLS okuma
 | FullRLS+bound | 3.8e-11 | 0.108 | 8.17 +/- 4.0 | 6.2e-3 |
 | BlockRLS+bound | 1.6e-4 | 0.545 | 0.459 +/- 0.22 | 1.0e-2 |
 | BlockRLS+naive | 1.6e-4 | 0.543 | 0.456 | 1.0e-2 |
-| MultiHead | 1.6e-4 | 0.545 | 0.422 +/- 0.16 | 9.3e-3 |
-| **BlockRLS+CTX** | 1.9e-4 | 0.443 | **0.096 +/- 0.02** | 3.7e-2 |
+| MultiHead | 1.6e-4 | 0.545 | 0.424 +/- 0.16 | 9.3e-3 |
+| **BlockRLS+CTX** | 1.9e-4 | 0.443 | **0.104 +/- 0.02** | 3.7e-2 |
 
-**Sonuc (nedensel-m2 mekanizmasi, son hali): x4.76 ortalama F3-onset
+**Sonuc (nedensel-m2 mekanizmasi, son hali): x4.40 ortalama F3-onset
 iyilesmesi; 10/10 seed iyilesti (0.067-0.128). En kotu durum
 0.913 -> 0.081. Naive konsolidasyon kazanci sifir.
 Wilcoxon signed-rank (block>ctx, tek-yonlu): W=55, p=9.8e-4;
 paired t: t=4.85, p=9.1e-4.**
-Pencere duyarliligi: w=100/250/500 -> x5.13 / x4.76 / x4.91.
+Pencere duyarliligi: w=100/250/500 -> x4.41 / x4.40 / x4.66.
 (Earlier global-var runs: 0.095, x4.84 — neredeyse birebir ayni.)
 
-Rakip merdiveni (F3-onset): MultiHead 0.422 -> +alloc 0.369 (eksik
-tahsis kanali) -> +alloc+soft 0.268 (normalize gate de yarar ama
-yeterli degil; tek basina soft=0.303). Kalan ~x2.8 rakibin ungated
+Rakip merdiveni (F3-onset): MultiHead 0.424 -> +alloc 0.377 (eksik
+tahsis kanali) -> +alloc+soft 0.291 (normalize gate de yarar ama
+yeterli degil; tek basina soft=0.323). Kalan ~x2.8 rakibin ungated
 kanali olmadigindan gate'ten gelemez -> cift-oranli transfer
 mimarisine atfedilir (merdivenli dekompozisyon, faktoriyel degil).
 
@@ -48,9 +48,9 @@ R = 0.939 (ctx konsolidasyon olaylarinda medyan ||W_fast||, 180 olay).
 |---|---|---|
 || block | 0.459 | 0.010 |
 || block+clamp | 0.222 | 0.405 |
-|| ctx | 0.096 | 0.037 |
+|| ctx | 0.104 | 0.037 |
 - Klemp tek basina x2.07 (W=53, p=0.003); bellek klempin otesinde
-  x2.30 (W=55, p=0.001) -> x4.76 ~= x2.07 drenaj x x2.30 bellek.
+  x2.13 (W=55, p=0.001) -> x4.40 ~= x2.07 drenaj x x2.13 bellek.
 - LOSSY vs LOSSLESS: klemp F3-end'i ~40x bozar (0.405 vs 0.010);
   transfer bilgiyi korur -> "neden norm cap degil"in olculen cevabi.
 
@@ -67,12 +67,12 @@ Ablation katmanlari (10 seed, F3-onset NMSE):
 |---|---|---|
 | block | 0.459+/-0.22 | baseline |
 | naive | 0.456 | kosulsuz konsolidasyon |
-| MultiHead (Bereska) | 0.422+/-0.16 | RAKIP: 9/10 seed'de baseline'a coker |
-| MultiHead+alloc | 0.369+/-0.13 | kanal izolasyonu: tetik yardimci, mimari baskin |
+| MultiHead (Bereska) | 0.424+/-0.16 | RAKIP: 9/10 seed'de baseline'a coker |
+| MultiHead+alloc | 0.377+/-0.13 | kanal izolasyonu: tetik yardimci, mimari baskin |
 | CTX v0 (self-mask bug) | 0.455 | W_fast'in slot hatasina katilmasi |
-| CTX v1 (slow-err) | 0.204+/-0.07 | sadece self-masking duzeltmesi |
-| CTX v2 (+protect, norm) | 0.183+/-0.06 | causal esik altinda ORTALAMA kazanc var; 3/10 seed geriler |
-| CTX v3 (+count) | 0.096+/-0.02 | final — 10/10 seed'de v2'yi yener (p<1e-3) |
+| CTX v1 (slow-err) | 0.216+/-0.07 | sadece self-masking duzeltmesi |
+| CTX v2 (+protect, norm) | 0.187+/-0.06 | causal esik altinda ORTALAMA kazanc var; 2/10 seed geriler |
+| CTX v3 (+count) | 0.104+/-0.02 | final — 10/10 seed'de v2'yi yener (p<1e-3) |
 
 DOYGUNLUK MINI-ABLATION (sine->square->triangle->sine, 10 seed, F4-onset):
 | Politika | F4-onset | eviction | refusal |
@@ -124,9 +124,9 @@ gate kapali kalirken bile baglamlari ayirir — ampirik fark kaniti.
 | 1 | Kosulsuz konsolidasyon unutmayi W_slow'a tasir (x1.01) | DualMemory F3=0.379 |
 | 2 | Slot hatasina W_fast dahil edilirse self-masking: W_fast aktif slotun hatasini telafi eder, gate kilitlenir | Tum konsolidasyonlar slot0'a |
 | 3 | Zehirli slot (yanlis rejimle kontamine) argmin'i yaniltir: hatasi bos slottan da kotu olabilir | E_1=4.19 > var(y) |
-| 4 | "En bos slot" icin ||W_slow|| normu hatali vekil: rejimlerin agirlik normlari kiyaslanamaz (kare ~4x sinus). Causal esik altinda norm da ortalama kazanc verir (0.204->0.183) AMA yanlis secimde kontaminasyonu KORUR -> 3/10 seed geriler (en kotu seed 0: 0.139->0.173, +%25; seed 5: +%21) | v2: 7 seed iyi, 3 seed kotu |
-| 5 | cons_count sayaci dogru doluluk olcutu: hem dogru hedef hem dusuk varyans; 10/10 seed'de v2'yi yener | v3 0.096+/-0.02 vs v2 0.183+/-0.06 |
-| 6 | PASIF koruma (Bereska) tek kanaldir: gate-floor asilmazsa mekanizma hic devreye girmez; write-triggered alloc kanali kismen kurtarir | MH 0.422->+alloc 0.369 (seed 1/6/8) |
+| 4 | "En bos slot" icin ||W_slow|| normu hatali vekil: rejimlerin agirlik normlari kiyaslanamaz (kare ~4x sinus). Causal esik altinda norm da ortalama kazanc verir (0.216->0.187) AMA yanlis secimde kontaminasyonu KORUR -> 2/10 seed geriler (en kotu seed 0: 0.147->0.176, +%20; seed 5: +%18) | v2: 8 seed iyi, 2 seed kotu |
+| 5 | cons_count sayaci dogru doluluk olcutu: hem dogru hedef hem dusuk varyans; 10/10 seed'de v2'yi yener | v3 0.104+/-0.02 vs v2 0.187+/-0.06 |
+| 6 | PASIF koruma (Bereska) tek kanaldir: gate-floor asilmazsa mekanizma hic devreye girmez; write-triggered alloc kanali kismen kurtarir | MH 0.424->+alloc 0.377 (seed 1/6/8) |
 | 7 | Konsolidasyon = W_fast basinc valfi: yazim reddedilirse W_fast siser (norm ~30), dogru slot bogulur | refuse 0.073 vs overwrite 0.016 |
 
 **Duzeltmelerin matematigi:**
@@ -151,7 +151,7 @@ gate kapali kalirken bile baglamlari ayirir — ampirik fark kaniti.
   ([0,1,0] 3/5) ama kazanilacak marj kucuk -> x1.05. (m2'nin mu^2
   terimi ayrismayi zayiflatir: oracle-var altinda 5/5 idi — nedenselligin
   olculen bedeli.)
-- Unutma pahaliysa (sinus<->kare): x4.76.
+- Unutma pahaliysa (sinus<->kare): x4.40.
 
 Bu, "mekanizma her zaman iyilestirir"den daha guclu bir iddia: **zararsiz ve
 kosullu fayda saglar**; en kotu tek vaka gozlemi %14 maliyet payiyla sinirli.
@@ -175,3 +175,35 @@ kosullu fayda saglar**; en kotu tek vaka gozlemi %14 maliyet payiyla sinirli.
 - `python continual_protocol.py` : sinus->kare->sinus (10 seed, 4 yontem)
 - `python different_tasks.py` : MG-rejim ve NARMA-MG genelleme testleri (5 seed)
 - Tum RNG `np.random.default_rng(seed)` ile yerel; seed=0..9/0..4.
+
+## 7. Native-LM kolu: 6-arm x 3-seed causal grid (apia-v3-causal, Kaggle)
+
+`native_lm_v3_causal.json` — tinyshakespeare char-LM, A->B->A->B->A
+donus akisi (5 faz), frozen char-embedding ozellikleri uzerinde APIA.
+Gate-ordering fix SONRASI ilk tam matris (onceden hardgate/oracle/
+forced/detect tek seed idi). Birim: bits-per-char (dusuk = iyi).
+
+| Arm | final BPC | return-onset (A2,B2,A3) | vs block |
+|---|---|---|---|
+| apia_block | 5.658 | 5.776 +/- 0.004 | — |
+| apia_ctxmem (soft) | 5.660 | 5.773 +/- 0.014 | -0.003 +/- 0.014 |
+| apia_ctxmem_forced | 5.658 | 5.776 +/- 0.004 | +0.000 (cons=0) |
+| apia_ctxmem_detect | 5.665 | 5.784 +/- 0.014 | +0.008 +/- 0.014 |
+| apia_ctxmem_hardgate | **5.632** | **5.653 +/- 0.107** | **-0.123 +/- 0.108** |
+| apia_ctxmem_oracle | 5.634 | 5.674 +/- 0.074 | -0.102 +/- 0.075 |
+
+Okuma:
+- Soft gate (paper-1 mekanizmasi) native-LM ozelliklerinde kazanc
+  saglamiyor (-0.003) — reservoir regresyonundaki x4.40 burada yok.
+- HARD gate ise gercek kazanc veriyor: return-onset'te -0.12 BPC,
+  final'de -0.026 BPC; ustelik oracle'i bile yakaliyor/asiyor
+  (gate kalitesi darbogaz degil — slot icerigi yeterli).
+- Kazanc seed-bagimli: seed 0/1'de -0.16/-0.20, seed 2'de ~0.
+- forced kolu kontrol olarak calisti: cons=0, block ile birebir ayni
+  (tetik sarti hic saglanmadi — forced-write kosulu e_fast esigine
+  bagli kaldi).
+- detect (degisim-noktasi tetikli) hafif kotu: +0.008.
+- Sonuc, paper-2'nin "bellek faydasi ozellik-uzayina bagli"
+  anlatisiyla tutarli: siniflandirma ozelliklerinde (GPT-2/OPT) soft
+  gate faydasiz, char-LM'de ise sadece hard atama kazanc veriyor —
+  mekanizma transfer ediyor ama fayda gate tasarimina duyarli.
