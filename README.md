@@ -57,10 +57,15 @@ clamp control recovers only part of the gain — slot content matters.
 | `audit_numbers.py` | 24-assert data audit: every claim vs data files |
 | `build_tex.py`, `lint_tex.py`, `lint_pdf.py` | md->tex build + render lint |
 | `metrics.json`, `fig_data.npz`, `saturation_data.npz`, `valve_data.npz`, `clamp_control.json` | measured data (single source of truth) |
-| `llm_spike.py`, `cls_spike.py`, `adapter_spike.py`, `scale_spike.py` | Phase-2 feasibility spikes: same mechanism on frozen GPT-2 features — time-series, domain-return classification, APIA-vs-LoRA head-to-head, 124M->774M scale sweep. Not part of the paper's protocol — seeds for a follow-up study |
+| `llm_spike.py`, `cls_spike.py`, `adapter_spike.py`, `scale_spike.py` | Phase-2 experiments: same mechanism on frozen GPT-2 features — time-series, domain-return classification, APIA-vs-LoRA head-to-head, 124M->774M scale sweep |
 | `vram_spike.py` | Phase-2: gpt2-large batch sweep — APIA fwd-only vs LoRA fwd+bwd+AdamW peak VRAM (`vram_scaling` key) |
-| `fig_phase2_scale.py`, `fig_vram_wall.py` | README figure generators (data from `spike_results.json`) |
+| `fig_phase2_scale.py`, `fig_vram_wall.py`, `fig_vram_dual.py` | README figure generators (data from `spike_results.json`) |
 | `spike_results.json` | Phase-2 spike measurements (P3 errors, VRAM, ms/step, lr-sweep, vram_scaling) |
+| `build_tex2.py`, `fig1_architecture_p2.py`, `fig2_lr_sweep.py` | Phase-2 paper build + figures (`arxiv2_src/`) |
+| `native_apia_lm.py`, `_chunked.py` | Phase-3: native APIA char-LM — Kaggle kernels (gate-fix, hard-gate, forced-trigger, detect arms) |
+| `mamba_apia_spike.py`, `mamba_apia_results.json` | Phase-2 Mamba probe: 2x2 + multi-layer grid (negative result, paper-2 §5.5) |
+| `analyze_gate_E.py`, `normalize_gate_e.py` | gate-diagnostic tooling for the v3 mechanism-repair chain |
+| `kaggle_*_out/` | per-run Kaggle outputs: `native_lm_v3_*.json` + kernel logs |
 
 ## Reproduce
 
@@ -80,11 +85,14 @@ python lint_pdf.py                # render-level checks (needs tectonic+pdftotex
 Every run uses `np.random.default_rng(seed)` — seeds 0-9 (main),
 0-4 (cross-family). Results are bit-reproducible.
 
-## Phase-2 spikes (preliminary, not part of the paper)
+## Phase-2: APIA on frozen LLM backbones
 
-Same mechanism mounted on frozen GPT-2 features, tested against
-online LoRA on a domain-return classification stream
-(`spike_results.json` for all numbers):
+Same mechanism mounted on frozen LLM features (GPT-2 family, OPT-1.3B,
+Mamba-130M/1.4B probed), tested against online LoRA on a domain-return
+classification stream (`spike_results.json` for all numbers).
+Phase-2 paper: `paper2_draft.md` -> `arxiv2_src/paper2.tex`.
+
+![APIA on a frozen LLM](fig1_architecture_p2.png)
 
 ![Scale sweep: APIA vs online LoRA](fig_phase2_scale.png)
 
@@ -95,12 +103,12 @@ same LoRA config collapses; updates cost ~1 ms regardless of model
 size vs 61-196 ms. See `llm_spike.py`, `cls_spike.py`,
 `adapter_spike.py`, `scale_spike.py`.
 
-### The scaling wall (measured on a 6GB device)
+### The scaling wall (6GB desktop + 16GB T4)
 
-Same protocol on frozen `gpt2-large`, seq-128, batch sweep 1→8
-(`vram_spike.py`, `spike_results.json[vram_scaling]`):
+Same protocol on frozen `gpt2-large` (6GB device) and OPT-1.3B fp16
+(16GB T4), batch sweeps (`vram_spike.py`, `kaggle_1p3b_vram.py`):
 
-![VRAM wall: LoRA spills, APIA stays flat](fig_vram_wall.png)
+![VRAM wall at two hardware tiers](fig_vram_dual.png)
 
 | batch | APIA peak | LoRA peak |
 |---|---|---|
@@ -119,8 +127,10 @@ learning-state cost scales with the feature dimension (~400 KB), not
 the model — the structural reason a frozen 100B backbone could adapt
 in a fixed memory budget.** Timing scopes differ (APIA update is
 feature-space RLS; LoRA is full fwd+bwd+opt), so the speed gap is a
-lower bound, not a headline.
+lower bound, not a headline. On the 16GB tier the wall moves but is
+not removed: LoRA OOMs at batch 64 while APIA peaks at 8.4 GB.
 
-## Paper
+## Papers
 
-`paper_draft.md` -> `paper.tex` -> `paper.pdf` (19 pp).
+- Phase-1 (reservoir): `paper_draft.md` -> `arxiv_src/` (19 pp).
+- Phase-2 (frozen LLM): `paper2_draft.md` -> `arxiv2_src/paper2.tex`.
