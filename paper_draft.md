@@ -298,7 +298,12 @@ $$
 w_i \propto \exp\!\big(-\eta\, E_i / \max(E_{\min},\epsilon)\big),
 $$
 where $\eta=2$ sharpens the gate and the $E_i$ are slow-exponential
-context-matching errors ($\alpha_{\mathrm{ema}}=0.01$). $W_{\mathrm{fast}}$
+context-matching errors ($\alpha_{\mathrm{ema}}=0.01$). The ordering is
+strictly prequential: at step $t$ the gate is computed from the EMA
+statistics $E_i$ accumulated over $y_{<t}$ only, the gated prediction
+is then emitted and scored against $y_t$, and only afterwards are
+$E_i$, $W_{\mathrm{fast}}$, and the consolidation channel updated with
+the new observation. $W_{\mathrm{fast}}$
 is trained on the residual target $y_t - \beta\,\phi_t^\top
 \bar{W}_{\mathrm{slow}}$, so the fast component learns only what the
 gated slow mixture does not already explain.
