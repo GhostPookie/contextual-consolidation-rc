@@ -14,8 +14,6 @@ All learning is local and online: no backpropagation, no replay
 buffer, no offline batch passes. ~130 us/step, ~0.13 MB (float64)
 in the pure-NumPy prototype.
 
-Archive DOI: [10.5281/zenodo.24448925](https://doi.org/10.5281/zenodo.24448925)
-
 ## Architecture
 
 ![System architecture](fig1_architecture.png)

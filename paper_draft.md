@@ -992,6 +992,5 @@ Aggregated metrics are emitted to `metrics.json`; per-seed arrays to
 `fig_data.npz`, `saturation_data.npz`, `valve_data.npz`, and
 `clamp_control.json`, from which every table and figure in this
 paper is generated. Code and data are publicly available at
-<https://github.com/GhostPookie/contextual-consolidation-rc>
-(archived at doi:10.5281/zenodo.24448925);
+<https://github.com/GhostPookie/contextual-consolidation-rc>;
 hardware and software versions are listed in Sec. 4.1.
