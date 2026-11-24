@@ -1,0 +1,13 @@
+\begin{tabular}{lcc}
+\toprule
+Configuration & F4-onset NMSE & $\|W_{\mathrm{fast}}\|$ at boundary \\
+\midrule
+Block-RLS (memoryless) & $0.069\pm0.024$ & 34.7 \\
+Block-RLS + clamp & $0.051\pm0.014$ & 3.2 \\
+$S{=}2$, refuse & $0.073\pm0.030$ & 35.8 \\
+$S{=}2$, refuse + clamp & $0.019\pm0.013$ & 3.2 \\
+$S{=}2$, overwrite & $\mathbf{0.016\pm0.002}$ & 0.31 \\
+$S{=}3$, overwrite & $0.023\pm0.012$ & --- \\
+$S{=}3$, refuse & $0.070\pm0.028$ & --- \\
+\bottomrule
+\end{tabular}

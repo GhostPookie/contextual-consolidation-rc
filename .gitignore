@@ -14,9 +14,35 @@ vcheck*.png
 paper.out
 paper.aux
 paper.log
-RESULTS.md
-paper_outline.md
 .playwright-mcp/
 ctx_repo.zip
 llm_feat_*.npz
 clsfeat_*.npz
+
+# kernel-build scratch & base64 chunks
+_cb*.txt
+_fc*.txt
+_w*.txt
+_w64*.txt
+_wb_c*.txt
+_cell_full.txt
+_final_cell.txt
+_chunked64.txt
+_combo64.txt
+_v3c_*.js
+_v3cell.py
+_probe_cell.py
+kaggle_v2_cell.py
+nul
+
+# datasets (re-downloadable, don't ship in git)
+tinyshakespeare.txt
+kaggle_*_out/tinyshakespeare.txt
+
+# kaggle kernel build dirs (script.py assembled by build script)
+kaggle_kernel/
+kaggle_mamba/
+
+# windows artifacts
+Thumbs.db
+desktop.ini

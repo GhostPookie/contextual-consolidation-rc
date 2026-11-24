@@ -1,0 +1,10 @@
+\begin{tabular}{lcl}
+\toprule
+Competitor ladder & F3-onset NMSE & Interpretation \\
+\midrule
+MultiHead (prior art) & $0.422\pm0.16$ & passive protection never engages \\
+MultiHead+alloc & $0.369\pm0.13$ & write-trigger channel: helps seeds 1, 6, 8 \\
+MultiHead+alloc+soft & $0.268\pm0.09$ & +normalized gate: borrows $\times1.6$ of gap \\
+CTX (ours) & $\mathbf{0.096\pm0.02}$ & remaining $\approx$2.8$\times$ = dual-rate transfer \\
+\bottomrule
+\end{tabular}

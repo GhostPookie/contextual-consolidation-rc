@@ -500,6 +500,213 @@ if _HAVE_NUMBA:
                 nll, cnt = 0.0, 0
         return curve[:nci], steps[:nci], n_cons
 
+    @njit(cache=True)
+    def _nb_run_ctxmem_v3(tokens, W_in, Wd, Wi, Wp, alpha, knots,
+                          degree, K, W, Pb, Pbias, lam, trace_bound,
+                          bias_bound, W_slow, E, beta, gamma, eta,
+                          a_ema, a_fast, cons_every, e_gate, tau,
+                          p_inflate, cons_counts, eval_every, vocab,
+                          sat_mode):
+        """_nb_run_ctxmem + sat_mode (0=refuse, 1=overwrite) + logs.
+
+        cons_log: (step, target, mode) per consolidation ATTEMPT:
+          mode 0 = REINFORCE write (E_k < tau*m2)
+          mode 1 = NEW-CONTEXT write to emptiest slot
+          mode 3 = OVERWRITE evict least-consolidated (sat_mode=1)
+          mode -1 = REFUSED (sat_mode=0, saturated)
+        gate_log: per eval boundary -> argmax slot, E vector snapshot.
+        """
+        D = W_in.shape[0]
+        F = D * K + 1
+        C = vocab
+        S = W_slow.shape[0]
+        n = tokens.shape[0] - 1
+        h = np.zeros(D)
+        tmp = np.zeros(D)
+        Nbuf = np.zeros(knots.shape[0] - 1)
+        ok = np.empty(degree + 3, np.int64)
+        ov = np.empty(degree + 3)
+        jk = np.empty((D, degree + 2), np.int64)
+        jv = np.empty((D, degree + 2))
+        jc = np.empty(D, np.int64)
+        Q = np.empty((D, K))
+        scores = np.empty(C)
+        ss = np.empty((S, C))
+        w = np.empty(S)
+        e = np.empty(C)
+        n_eval = n // eval_every
+        curve = np.empty(n_eval)
+        steps = np.empty(n_eval, np.int64)
+        gate_am = np.empty(n_eval, np.int64)
+        gate_E = np.empty((n_eval, S))
+        max_att = n // cons_every + 2
+        cl_step = np.empty(max_att, np.int64)
+        cl_tgt = np.empty(max_att, np.int64)
+        cl_mode = np.empty(max_att, np.int64)
+        nll, cnt, nci = 0.0, 0, 0
+        e_fast, m2 = 0.0, 1.0
+        a_m2 = 0.02
+        step_c, n_cons, n_cl = 0, 0, 0
+        ln2 = np.log(2.0)
+        for t in range(n):
+            _res_tanh(h, tokens[t], W_in, Wd, Wi, Wp, alpha, tmp)
+            for m in range(C):
+                scores[m] = W[F - 1, m]
+            for s_ in range(S):
+                for m in range(C):
+                    ss[s_, m] = 0.0
+            for j in range(D):
+                c = _basis_nz(tmp[j], knots, degree, K, Nbuf, ok, ov)
+                jc[j] = c
+                for z in range(c):
+                    jk[j, z] = ok[z]
+                    jv[j, z] = ov[z]
+                    r = j * K + ok[z]
+                    v = ov[z]
+                    for m in range(C):
+                        scores[m] += v * W[r, m]
+                    for s_ in range(S):
+                        for m in range(C):
+                            ss[s_, m] += v * W_slow[s_, r, m]
+            tgt = tokens[t + 1]
+            for s_ in range(S):
+                acc = 0.0
+                for m in range(C):
+                    acc += (beta * ss[s_, m]) ** 2
+                acc += (1.0 - beta * ss[s_, tgt]) ** 2 - (
+                    beta * ss[s_, tgt]) ** 2
+                E[s_] = (1.0 - a_ema) * E[s_] + a_ema * acc
+            emin = E[0]
+            for s_ in range(1, S):
+                if E[s_] < emin:
+                    emin = E[s_]
+            if emin < 1e-8:
+                emin = 1e-8
+            zmax = -1e30
+            for s_ in range(S):
+                z = -eta * E[s_] / emin
+                w[s_] = z
+                if z > zmax:
+                    zmax = z
+            wsum = 0.0
+            for s_ in range(S):
+                w[s_] = np.exp(w[s_] - zmax)
+                wsum += w[s_]
+            for m in range(C):
+                acc = 0.0
+                for s_ in range(S):
+                    acc += w[s_] * ss[s_, m]
+                scores[m] += beta * acc / wsum
+            mx = scores[0]
+            for m in range(1, C):
+                if scores[m] > mx:
+                    mx = scores[m]
+            se = 0.0
+            for m in range(C):
+                se += np.exp(scores[m] - mx)
+            nll += -np.log(np.exp(scores[tgt] - mx) / se) / ln2
+            cnt += 1
+            for m in range(C):
+                e[m] = -scores[m]
+            e[tgt] += 1.0
+            s = lam + Pbias[0]
+            for j in range(D):
+                for i in range(K):
+                    acc = 0.0
+                    for z in range(jc[j]):
+                        acc += Pb[j, i, jk[j, z]] * jv[j, z]
+                    Q[j, i] = acc
+                for z in range(jc[j]):
+                    s += jv[j, z] * Q[j, jk[j, z]]
+            for j in range(D):
+                for i in range(K):
+                    g = Q[j, i] / s
+                    for m in range(C):
+                        W[j * K + i, m] += g * e[m]
+                    for k in range(K):
+                        Pb[j, i, k] = (Pb[j, i, k] - g * Q[j, k]) / lam
+            gb = Pbias[0] / s
+            for m in range(C):
+                W[F - 1, m] += gb * e[m]
+            Pbias[0] = (Pbias[0] - gb * Pbias[0]) / lam
+            if trace_bound > 0.0:
+                for j in range(D):
+                    tr = 0.0
+                    for i in range(K):
+                        tr += Pb[j, i, i]
+                    if tr > trace_bound:
+                        sc = trace_bound / tr
+                        for i in range(K):
+                            for k in range(K):
+                                Pb[j, i, k] *= sc
+                if bias_bound > 0.0 and Pbias[0] > bias_bound:
+                    Pbias[0] = bias_bound
+            en = 0.0
+            for m in range(C):
+                en += e[m] * e[m]
+            e_fast = (1.0 - a_fast) * e_fast + a_fast * en
+            m2 = (1.0 - a_m2) * m2 + a_m2 * 1.0
+            step_c += 1
+            if step_c % cons_every == 0 and e_fast <= e_gate * m2:
+                k = 0
+                for s_ in range(1, S):
+                    if E[s_] < E[k]:
+                        k = s_
+                target, mode = -1, -1
+                if E[k] < tau * m2:
+                    target, mode = k, 0          # REINFORCE
+                else:
+                    cmin = cons_counts[0]
+                    for s_ in range(1, S):
+                        if cons_counts[s_] < cmin:
+                            cmin = cons_counts[s_]
+                    if cmin > 0:
+                        if sat_mode == 1:
+                            target = 0           # OVERWRITE: evict
+                            for s_ in range(1, S):
+                                if cons_counts[s_] < cons_counts[target]:
+                                    target = s_
+                            mode = 3
+                        # else refuse: target=-1, mode=-1
+                    else:
+                        target = 0               # NEW-CONTEXT
+                        for s_ in range(1, S):
+                            if cons_counts[s_] < cons_counts[target]:
+                                target = s_
+                        mode = 1
+                cl_step[n_cl] = step_c
+                cl_tgt[n_cl] = target
+                cl_mode[n_cl] = mode
+                n_cl += 1
+                if target >= 0:
+                    cf = (1.0 - gamma) / beta
+                    for r in range(F):
+                        for m in range(C):
+                            W_slow[target, r, m] += cf * W[r, m]
+                            W[r, m] *= gamma
+                    for j in range(D):
+                        for i in range(K):
+                            for kk in range(K):
+                                Pb[j, i, kk] *= p_inflate
+                    Pbias[0] *= p_inflate
+                    cons_counts[target] += 1
+                    n_cons += 1
+            if (t + 1) % eval_every == 0:
+                curve[nci] = nll / cnt
+                steps[nci] = t + 1
+                am = 0
+                for s_ in range(1, S):
+                    if w[s_] > w[am]:
+                        am = s_
+                gate_am[nci] = am
+                for s_ in range(S):
+                    gate_E[nci, s_] = E[s_]
+                nci += 1
+                nll, cnt = 0.0, 0
+        return (curve[:nci], steps[:nci], n_cons,
+                cl_step[:n_cl], cl_tgt[:n_cl], cl_mode[:n_cl],
+                gate_am[:nci], gate_E[:nci])
+
 
 def _apia_init(vocab, n_res, n_basis, seed):
     sub = ReservoirSubstrate(vocab, n_res=n_res, n_basis=n_basis,
@@ -572,6 +779,104 @@ def run_apia_fast(stream, vocab, arm, seed, n_res=512, n_basis=10,
         param_floats=int(sub.param_floats + W.size),
         learn_state_bytes=int(state_bytes),
         peak_vram_mb=0, n_consolidations=int(n_cons))
+
+
+def run_apia_v3(stream, vocab, arm, seed, n_res=512, n_basis=10,
+                eval_every=2000, cons_every=5000, verbose=True):
+    """v3: ctxmem with explicit saturation policy + cons/gate logs.
+
+    arm='apia_ctxmem_refuse'    -> sat_mode 0 (write-protected)
+    arm='apia_ctxmem_overwrite' -> sat_mode 1 (evict least-consolidated)
+    arm='apia_block'            -> delegates to _nb_run_block.
+    cons_every defaults 5000 so slot writes use a MATURE W_fast
+    (v2's 250 wrote immature weights within the first ~750 steps).
+    """
+    if not _HAVE_NUMBA:
+        raise RuntimeError("numba unavailable")
+    sub, rls, a = _apia_init(vocab, n_res, n_basis, seed)
+    tok = np.ascontiguousarray(stream.astype(np.int64))
+    t0 = time.perf_counter()
+    cons_log, gate_log, gate_E = None, None, None
+    if arm == "apia_block":
+        curve, steps = _nb_run_block(
+            tok, a["W_in"], a["Wd"], a["Wi"], a["Wp"], a["alpha"],
+            a["knots"], a["degree"], a["K"], a["W"], a["Pb"],
+            a["Pbias"], a["lam"], a["trace_bound"], a["bias_bound"],
+            eval_every, vocab)
+        n_cons = 0
+    elif arm in ("apia_ctxmem_refuse", "apia_ctxmem_overwrite"):
+        sat_mode = 0 if arm.endswith("refuse") else 1
+        S = 3
+        W_slow = np.zeros((S,) + a["W"].shape)
+        E = np.zeros(S)
+        cons_counts = np.zeros(S, np.int64)
+        (curve, steps, n_cons, cl_step, cl_tgt, cl_mode,
+         gate_am, gate_E) = _nb_run_ctxmem_v3(
+            tok, a["W_in"], a["Wd"], a["Wi"], a["Wp"], a["alpha"],
+            a["knots"], a["degree"], a["K"], a["W"], a["Pb"],
+            a["Pbias"], a["lam"], a["trace_bound"], a["bias_bound"],
+            W_slow, E, 1.0, 0.1, 5.0, 0.05, 0.1, cons_every, 1.0,
+            0.5, 1.5, cons_counts, eval_every, vocab, sat_mode)
+        a["W_slow"] = W_slow
+        cons_log = dict(step=[int(v) for v in cl_step],
+                        target=[int(v) for v in cl_tgt],
+                        mode=[int(v) for v in cl_mode],
+                        slot_counts=[int(v) for v in cons_counts])
+        gate_log = [int(v) for v in gate_am]
+        gate_E = gate_E.tolist()
+    else:
+        raise ValueError(arm)
+    dt = time.perf_counter() - t0
+    n = len(stream) - 1
+    tail = list(curve)[max(0, len(curve) - 5):]
+    W = rls.get_weights()
+    state_bytes = (sub.state_bytes + W.nbytes
+                   + rls.P_blocks.nbytes + rls.P_bias.nbytes
+                   + a.get("W_slow", np.empty(0)).nbytes)
+    if verbose:
+        print(f"  {arm} done {dt:.0f}s", flush=True)
+    return dict(
+        arm=arm, seed=seed, n_chars=n,
+        final_bpc=float(np.mean(tail)),
+        bpc_curve=[float(v) for v in curve],
+        curve_steps=[int(v) for v in steps],
+        chars_per_s=float(n / dt), wall_s=float(dt),
+        param_floats=int(sub.param_floats + W.size),
+        learn_state_bytes=int(state_bytes),
+        peak_vram_mb=0, n_consolidations=int(n_cons),
+        cons_every=cons_every, cons_log=cons_log,
+        gate_argmax=gate_log, gate_E=gate_E)
+
+
+def make_shift_stream(stream, vocab, a_len=100000, b_len=50000,
+                      shift=1):
+    """A -> B(shifted) -> A' stream. B is the SAME source chars as the
+    A'-window predecessor segment, Caesar-shifted by `shift` mod vocab:
+    pure symbol relabeling, identical bigram structure -> clean new
+    context that the gate can in principle re-detect at return."""
+    A = stream[:a_len]
+    B = (stream[a_len:a_len + b_len] + shift) % vocab
+    Ap = stream[a_len + b_len:2 * a_len]
+    return np.concatenate([A, B, Ap]), a_len, b_len
+
+
+def phase_metrics(run, a_len=100000, b_len=50000, onset=10000):
+    """Onset/end BPC per phase. Onset = first `onset` steps of phase;
+    end = last `onset` of phase. Steps are 1-based stream positions."""
+    steps = np.asarray(run["curve_steps"])
+    curve = np.asarray(run["bpc_curve"])
+    bounds = [0, a_len, a_len + b_len, len(steps) * (steps[-1] // len(steps))]
+    total = steps[-1]
+    bounds[3] = total
+    out = {}
+    names = ["A", "B", "A'"]
+    for i, nm in enumerate(names):
+        lo, hi = bounds[i], bounds[i + 1]
+        on = curve[(steps > lo) & (steps <= lo + onset)]
+        en = curve[(steps > hi - onset) & (steps <= hi)]
+        out[f"onset_{nm}"] = float(on.mean()) if len(on) else None
+        out[f"end_{nm}"] = float(en.mean()) if len(en) else None
+    return out
 
 
 # ---------- torch baselines ----------
